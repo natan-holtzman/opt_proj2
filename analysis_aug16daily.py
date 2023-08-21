@@ -146,7 +146,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfday = dfday.loc[dfday.rain_prev==0].copy()
 
     #%%
-    use_mm = 1
+    use_mm = 0
     if use_mm:
         def tofit(pars):
             amax1,kA,gmax1,kG = pars
@@ -162,30 +162,52 @@ for site_id in pd.unique(bigyear.SITE_ID):
         myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))
 
         amax1,kA,gmax1,kG = myfit.x
-    #%%
-    dfull["amax1"] = amax1
-    dfull["kA1"] = kA
-    dfull["gmax1"] = gmax1
-    dfull["kG1"] = kG
+
+        dfull["amax1"] = amax1
+        dfull["kA1"] = kA
+        dfull["gmax1"] = gmax1
+        dfull["kG1"] = kG
+        
+        dfull["amax_d2"] = amax1*dfull.par/(dfull.par + kA) * dfull.LAI
+        dfull["gA_d2"] = gmax1*dfull.par/(dfull.par + kG) * dfull.LAI
+        gAtest = gmax1*dfday.par/(dfday.par + kG) * dfday.LAI
+
+       
+    else:
+        def tofit(pars):
+            a_amax,b_amax,a_gA,b_gA = pars
+            
+            amax = a_amax*(dfday.par/250)**b_amax * dfday.LAI
+            gA = a_gA*(dfday.par/250)**b_gA * dfday.LAI
     
-    # #%%
-    dfull["amax_d2"] = amax1*dfull.par/(dfull.par + kA) * dfull.LAI
-    dfull["gA_d2"] = gmax1*dfull.par/(dfull.par + kG) * dfull.LAI
+            gpp_pred = amax*(1-np.exp(-dfday.cond2/gA))
+            z = (gpp_pred-dfday.gpp)#[dfday.VPD > 1]
+            return z
+        himean = np.quantile(dfday.gpp/dfday.LAI,0.9)
+        fit0 = np.array([himean,1,himean/120,1])
+        myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))
+
+        a_amax,b_amax,a_gA,b_gA = myfit.x
+
+        dfull["a_amax"] = a_amax
+        dfull["b_amax"] = b_amax
+        dfull["a_gA"] = a_gA
+        dfull["b_gA"] = b_gA
+        
+        dfull["amax_d2"] = a_amax*(dfull.par/250)**b_amax * dfull.LAI
+        dfull["gA_d2"] = a_gA*(dfull.par/250)**b_gA * dfull.LAI
+        gAtest = a_gA*(dfday.par/250)**b_gA * dfday.LAI
+
+    #%%   
+    dfull.loc[dfull.rain > 0, "gA_d2"]  = np.nan
+    dfull.loc[dfull.rain_prev > 0, "gA_d2"]  = np.nan
+
 
     dfull["gpp_pred_d2"] = dfull.amax_d2*(1-np.exp(-dfull.cond2/dfull.gA_d2))
     
-    dfull["kgpp"] = dfull.gA_d2#*dfull.dayfrac
     
-    dfull["gpp_pred_d2a"] = 1.5*dfull.amax_d2*(1-np.exp(-dfull.cond2/dfull.gA_d2/1.5))
-    dfull["gpp_pred_d2b"] = 0.5*dfull.amax_d2*(1-np.exp(-dfull.cond2/dfull.gA_d2/0.5))
-    
-    
-    dfull["gpp_pred_d2c"] = dfull.amax_d2*(1-np.exp(-dfull.cond2/dfull.gA_d2/2))
-    dfull["gpp_pred_d2d"] = dfull.amax_d2*(1-np.exp(-dfull.cond2/dfull.gA_d2/0.5))
-    
-   
+    dfull["kgpp"] = dfull.gA_d2
     #%%
-    gAtest = gmax1*dfday.par/(dfday.par + kG) * dfday.LAI
     z1 = 1-np.exp(-dfday.cond2/gAtest)
     dfull["frac_gt9"] = np.mean(z1 > 0.9)
     
@@ -507,8 +529,6 @@ def mean_gt1(x):
     return np.mean(x[x >= 1])
 #%%
 df1b = df1.loc[df1.gppR2_exp > 0].copy()
-
-#%%
 #%%
 df_meta= df1b.loc[df1b.tau_ddreg > 0]
 
@@ -541,7 +561,7 @@ fig,ax = plt.subplots(1,1,figsize=(10,8))
 
 lmax = 1.1*np.max(df_meta.ddrain_mean)
 
-#line1, = ax.plot([0,lmax],[0,lmax],"k",label="1:1 line, $R^2$=0.59")
+#line1, = ax.plot([0,lmax],[0,lmax],"k",label="1:1 line, $R^2$=0.52")
 betas = np.array(np.round(np.abs(rainmod.params),2)).astype(str)
 if rainmod.params[0] < 0:
     reg_eqn = r"$\tau$ = "+betas[1]+"$D_{max}$"+" - "+betas[0]
@@ -746,7 +766,7 @@ def nanterp(x):
 ddlist = pd.concat(ddlist)
 #%%
 #tabS = ddlist.loc[ddlist.SITE_ID=="US-Me5"]
-site_pair = ["US-Me5","US-SRM"]
+site_pair = ["US-Me5","US-Wkg"]
 plt.figure()
 si = 1
 for x in site_pair:
@@ -760,7 +780,7 @@ for x in site_pair:
     jtab = tabS[tabS.ddi==longDD].reset_index()
     istart = np.where(np.isfinite(jtab.ET))[0][0]
     jtab = jtab.iloc[istart:].copy()
-    tau = 20
+    tau = 15
     #sm_init = jtab.et2.iloc[0]/jtab.F2.iloc[0]/(2/tau)
     #epred20 = np.sqrt(2/tau*jtab.F2*(sm_init-jtab.etcum))
     term1 = -1/tau*jtab.F*jtab.G
@@ -788,7 +808,7 @@ for x in site_pair:
     #sm_pred = 0.25*(-np.sqrt(2/tau)*jtab.G + c1)**2
     #epred20 = -np.diff(sm_pred)
     
-    tau = 50
+    tau = 45
     term1 = -1/tau*jtab.F*jtab.G
     #c2 = (np.nanmean(ej) - np.nanmean(term1))/np.nanmean(f2)
     #c2 = (np.nanmean(jtab.ET) - np.nanmean(term1))/np.nanmean(jtab.F)
@@ -819,8 +839,8 @@ for x in site_pair:
     #plt.subplot(2,1,si)
     xvar = np.arange(len(jtab.ET))+2
     plt.plot(xvar, np.array(jtab.ET),'ko-',linewidth=3,label="Eddy covariance")
-    plt.plot(xvar,epred50,'o-',color="tab:blue",linewidth=3,alpha=0.6,label=r"Model, $\tau$ = 50 days")
-    plt.plot(xvar,epred20,'o-',color="tab:orange",linewidth=3,alpha=0.6,label=r"Model, $\tau$ = 20 days")
+    plt.plot(xvar,epred50,'o-',color="tab:blue",linewidth=3,alpha=0.6,label=r"Model, $\tau$ = 45 days")
+    plt.plot(xvar,epred20,'o-',color="tab:orange",linewidth=3,alpha=0.6,label=r"Model, $\tau$ = 15 days")
     if si == 1:
         #plt.ylabel("ET (mm/day)",fontsize=22)
         #plt.ylim(-0.1,2)
@@ -838,8 +858,8 @@ plt.xticks(np.arange(2,23,3))
 plt.xlabel("Day of drydown",fontsize=22)
 plt.ylabel("ET (mm/day)",fontsize=22)
 plt.text(1.5,1.25,site_pair[0],fontsize=20)
-plt.text(1.5,2.5,site_pair[1],fontsize=20)
-plt.ylim(0,2.75)
+plt.text(1.5,2.7,site_pair[1],fontsize=20)
+plt.ylim(-0.1,3)
 
 # sinf = (ej / np.sqrt(fj) / np.sqrt(2/tau))**2
 # s = sinf[0]
@@ -857,11 +877,11 @@ plt.axvline(0,color="grey",linestyle="--")
 plt.axhline(0,color="grey",linestyle="--")
 
 tab1 =  ddlist.loc[ddlist.SITE_ID=="US-Me5"].copy()
-tab2 =  ddlist.loc[ddlist.SITE_ID=="US-SRM"].copy()
+tab2 =  ddlist.loc[ddlist.SITE_ID=="US-Wkg"].copy()
 #tab2 =  ddlist.loc[ddlist.SITE_ID=="US-ARc"].copy()
 
-plt.plot(tab1.row0,tab1.et_per_F_dm,'o',label=r"US-Me5, $\tau$ = 43 days",alpha=0.6)
-plt.plot(tab2.row0,tab2.et_per_F_dm,'o',label=r"US-SRM, $\tau$ = 16 days",alpha=0.6)
+plt.plot(tab1.row0,tab1.et_per_F_dm,'o',label=r"US-Me5, $\tau$ = 44 days",alpha=0.6)
+plt.plot(tab2.row0,tab2.et_per_F_dm,'o',label=r"US-Wkg, $\tau$ = 15 days",alpha=0.6)
 rA = sm.OLS(tab1.et_per_F_dm,tab1.row0,missing='drop').fit()
 rB = sm.OLS(tab2.et_per_F_dm,tab2.row0,missing='drop').fit()
 xarr = np.array([-25,25])
