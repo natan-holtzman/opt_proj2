@@ -342,8 +342,13 @@ def prepare_df(fname, site_id, bif_forest):
                               
                               "rain":rain_summer,
                               "rain_prev":rain_prev,
+                              "rain_qc":df["P_F_QC"],
                               "LAI":lai_all,
                               "smc":smc_summer,
+                              
+                              "gpp_dt":df["GPP_DT_VUT_REF"],
+                              "gpp_nt":df["GPP_NT_VUT_REF"]
+
                              
                               })
     
@@ -403,7 +408,7 @@ for fname in forest_daily:#[forest_daily[x] for x in [70,76]]:
     all_results.append(df_to_fit)
     #%%
 all_results = pd.concat(all_results)
-all_results.to_csv("dailydata_aug21.csv")
+all_results.to_csv("dailydata_aug26.csv")
 #%%
 # sites = []
 # years = []

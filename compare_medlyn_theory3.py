@@ -42,7 +42,7 @@ quot_pred = 1.6/400*(1+g1/np.sqrt(vpd_range))
 med_g = np.interp(quot_pred,g_range/a_exp,g_range)
 med_g[med_g < 0] = 0
 #%%
-fig,axes = plt.subplots(3,2,figsize=(15,18))
+fig,axes = plt.subplots(3,2,figsize=(18,18))
 ax = axes[0,0]
 #plt.figure(figsize=(10,6))
 ax.plot(vpd_range,new_opt_g,"r",label="Time-integrated",linewidth=3); 
@@ -178,4 +178,4 @@ ax.set_ylabel("$g_{MED}$ $(mol/m^2/s)$")
 ax.set_title("(f)",loc="left")
 
 
-plt.tight_layout()
+plt.tight_layout(w_pad=2)
