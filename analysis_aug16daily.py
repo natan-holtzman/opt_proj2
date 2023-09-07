@@ -155,7 +155,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["kgpp"] = dfull.gA_daily
     #%%
     dfull.loc[dfull.rain != 0, "gpp_pred_daily"] = np.nan
-    dfull.loc[dfull.rain_prev != 0, "gpp_pred_daily"] = np.nan
+    #dfull.loc[dfull.rain_prev != 0, "gpp_pred_daily"] = np.nan
     dfull.loc[dfull.vpd <= 0.5 , "gpp_pred_daily"] = np.nan
     
     
@@ -214,7 +214,12 @@ for site_id in pd.unique(bigyear.SITE_ID):
     rain_by_year = []
     
     smc_start = []
+    smc_end = []
+
     smc_avg = []
+    lai_avg = []
+    vpd_avg = []
+
     et_avg = []
     et_init = []
 
@@ -229,17 +234,20 @@ for site_id in pd.unique(bigyear.SITE_ID):
     
     dclist = []
     
+    cond1=[]
+    cond2=[]
+    
     #%%
     for y0 in pd.unique(dfGS.year_new):
     #%%
         dfy = dfGS.loc[dfGS.year_new==y0].copy()
-        if np.sum(np.isfinite(dfy.ET)) < 10:
+        if np.sum(np.isfinite(dfy.ET)) < 1:
             continue
         
         doy_indata = np.array(dfy.doy)
         vpd_arr = np.clip(np.array(dfy.vpd),0.1,np.inf)/100
-        if np.sum(np.isfinite(vpd_arr)) < 25:
-            continue
+        # if np.sum(np.isfinite(vpd_arr)) < 25:
+        #     continue
         vpd_interp = np.interp(doy_indata,
                             doy_indata[np.isfinite(vpd_arr)],
                             vpd_arr[np.isfinite(vpd_arr)])
@@ -277,7 +285,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
 
 #%%
         rain_days = np.array([0] + list(np.where(rain_arr > 0)[0]) + [len(rain_arr)])
-        ddgood = np.where(np.diff(rain_days) >= 7)[0] #7
+        ddgood = np.where(np.diff(rain_days) >= 5)[0] #7
         
         ddall += len(ddgood)
         
@@ -321,7 +329,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
             etsel = et_mmday_interp[starti:endi]#[:20]
             rainsel =  rain_arr[starti:endi]
             #if r1.params[1] < 0 and r1.pvalues[1] < 0.05:
-            if np.sum(np.isfinite(yfull)) >= 5 and np.mean(np.isfinite(yfull)) >= 0.75:
+            if np.sum(np.isfinite(yfull)) >= 3: # and np.mean(np.isfinite(yfull)) >= 0.5:
                 #et_over_dd.append(yfull - np.nanmean(yfull))
                 #ddreg_fixed.append(g_of_t - np.mean(g_of_t[np.isfinite(yfull)]))
                 etcumDD = np.array([0] + list(np.cumsum(etsel-rainsel)))[:-1]
@@ -332,6 +340,10 @@ for site_id in pd.unique(bigyear.SITE_ID):
 #                if rDD.pvalues[1] < 0.1 and rDD.params[1] < 0:
                 smc_start.append(dfy.smc.iloc[starti])               
                 smc_avg.append(np.mean(dfy.smc.iloc[starti:endi])) 
+                smc_end.append(dfy.smc.iloc[endi-1])
+                lai_avg.append(np.mean(dfy.LAI.iloc[starti:endi])) 
+                vpd_avg.append(np.mean(dfy.vpd.iloc[starti:endi])) 
+
                 et_avg.append(np.mean(dfy.ET.iloc[starti:endi]))               
                 et_init.append(dfy.ET.iloc[starti])             
 
@@ -365,6 +377,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
                     et_over_dd.append(yI)
                     ddreg_fixed.append(xI)
                     dclist.append(np.arange(len(xI)))
+                    cond1.append(dfy.cond2.iloc[starti:endi])
+
                     limited_dates.append(np.array(dfy.date)[starti:endi])
                     ddii += 1
                 else:
@@ -377,10 +391,16 @@ for site_id in pd.unique(bigyear.SITE_ID):
                     vpd_plain2.append(vpd_arr[starti:endi])
                     et_plain2.append(et_mmday[starti:endi])
                     krec2.append(dfy.kgpp.iloc[starti:endi])
+                    cond2.append(dfy.cond2.iloc[starti:endi])
+
 
 
         #%%
-        
+    # dclim = dfGS.groupby("doy").mean(numeric_only=True).reset_index()   
+    # dclim["wb1"] = np.cumsum(dclim.rain - dclim.ET*18/1000*60*60*24)
+    # dfGS2 = pd.merge(dfGS,dclim[["doy","wb1"]],on="doy",how="left")
+    # limited_df = dfGS2.loc[dfGS2.date.isin(np.concatenate(limited_dates))].copy()
+    # non_limited_df = dfGS2.loc[dfGS2.date.isin(np.concatenate(non_limited_dates))].copy()
     #%%
     if ddall < 3:
         site_message.append("Not enough dd")
@@ -421,18 +441,6 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["seas_rain_max5"] = np.mean(ymaxes)
     dfull["seas_rain_mean0"] = np.mean(ymeans0)
     dfull["seas_rain_max0"] = np.mean(ymaxes0)
-    #%%
-    theilmod = scipy.stats.theilslopes(et_topred[np.isfinite(et_topred)], row0[np.isfinite(et_topred)])
-    dfull["tau_theil"] = -2/theilmod.slope
-    dfull["tau_theil_lo"] = -2/theilmod.high_slope
-    dfull["tau_theil_hi"] = -2/theilmod.low_slope
-    
-    dfull["tau_wls0"] = -2/sm.WLS(et_topred[row0 > 0],row0[row0 > 0],missing='drop',weights=1/(row0[row0 > 0])**2).fit().params[0]
-    #%%
-    rb2 = np.concatenate(rain_by_year)
-    rb2 = rb2[rb2 > 0]
-    annual_freq = np.max(dfull.doy) - np.min(dfull.doy)
-    rb3 = np.repeat(rb2,rb2)
     #%%
     btab = pd.DataFrame({"SITE_ID":site_id,
         "ddi":np.concatenate(ddlabel),
@@ -490,92 +498,15 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["tau_simult_lo"] = -2/(dmod.params[0]+2*dmod.bse[0])
 
     #%%
-    smc_rev = dfull.ET*mol_s_to_mm_day/np.sqrt(dfull.kgpp*mol_s_to_mm_day * dfull.vpd/100)
-    smc_rev[dfull.rain > 0] = np.nan
-    smc_rev[dfull.rain_prev > 0] = np.nan
-    smc_rev[dfull.vpd < 0.5] = np.nan
-    smc_rev = np.array(smc_rev)
-    smc_rev[np.isinf(smc_rev)] = np.nan
-
-    et2 = np.array(dfull.ET)*mol_s_to_mm_day
-    et2[np.isnan(et2)] = np.nanmean(et2)
-    rainarr = np.array(dfull.rain)
-    wb1 = np.cumsum(rainarr-et2)
-    yarr = np.array(dfull.year_new)
-    for xy in np.where(yarr[1:] > yarr[:-1])[0] + 1:
-          wb1[xy:] -= wb1[xy]
-
-#%%
-    #wb1[np.isnan(smc_rev)] = np.nan
-    #%%
-    dfull["smc_rev1"] = smc_rev
-    dfull["smc_rev2"] = smc_rev**2
-    dfull["wb1"] = wb1
-    dfull["s_m_t"] = smc_rev**2 - 2/tau*wb1
-    
-    dclim2 = dfull.groupby("doy").mean(numeric_only=True).reset_index()
-    s1m = smf.ols("smc_rev2 ~ wb1", data=dclim2, missing="drop").fit()
-    dfull["tau_climreg"] = 2/s1m.params[1]
-    
-    dfull["tau_climreg_hi"] = 2/(s1m.params[1] - 2*s1m.bse[1])
-    dfull["tau_climreg_lo"] = 2/(s1m.params[1] + 2*s1m.bse[1])
-
-    # stdyear = dfull.groupby("year").std(numeric_only=True).reset_index()
-    y1m = smf.ols("smc_rev2 ~ wb1 + C(year_new)", data=dfull, missing="drop").fit()
-    y1m0 = smf.ols("smc_rev2 ~ C(year_new)", data=dfull, missing="drop").fit()
-    y1mT = smf.ols("s_m_t ~ C(year_new)", data=dfull, missing="drop").fit()
-
-#%%
-    etp1 = np.sqrt(y1m.predict(dfull)*dfull.kgpp*mol_s_to_mm_day * dfull.vpd/100)
-    etp0 = np.sqrt(y1m0.predict(dfull)*dfull.kgpp*mol_s_to_mm_day * dfull.vpd/100)
-    etpT = np.sqrt(2/tau*(wb1+tau/2*y1mT.predict(dfull))*dfull.kgpp*mol_s_to_mm_day * dfull.vpd/100)
-
-    # s1m = sm.OLS(stdyear.smc_rev2,stdyear.wb1,missing='drop').fit()
-    
-    # dfull["tau_fullreg"] = 2/y1m.params[-1]
-    # dfull["tau_stdreg"] = 2/s1m.params[0]
-    
-    # dfull["tau_stdreg_hi"] = 2/(s1m.params[0] - 2*s1m.bse[0])
-    # dfull["tau_stdreg_lo"] = 2/(s1m.params[0] + 2*s1m.bse[0])
-
-    # dfull["tau_fullreg_hi"] = 2/(y1m.params[-1] - 2*y1m.bse[-1])
-    # dfull["tau_fullreg_lo"] = 2/(y1m.params[-1] + 2*y1m.bse[-1])
-
-    #%%
     all_results.append(dfull)
     
     site_message.append("Tau estimated")
     #%%
-    site_dd_tab = pd.DataFrame({"smc0":smc_start,"wl":is_limited,"smcavg":smc_avg,"etavg":et_avg,"etinit":et_init})
+    site_dd_tab = pd.DataFrame({"smc0":smc_start,"wl":is_limited,"smcavg":smc_avg,"smcend":smc_end,
+                                "etavg":et_avg,"etinit":et_init,"lai":lai_avg,"vpd":vpd_avg})
     site_dd_tab["SITE_ID"] = site_id
     site_dd_limit.append(site_dd_tab)
     
-    # plt.figure(figsize=(14,10))
-    # plt.subplot(2,3,1)
-    # plt.plot(dfull.ET)
-    # plt.title("ET")
-    # plt.subplot(2,3,2)
-    # plt.plot(dfull.vpd)
-    # plt.title("VPD")
-    # plt.subplot(2,3,3)
-    # plt.plot(dfull.gpp)
-    # plt.title("GPP")
-    # plt.subplot(2,3,4)
-    # plt.plot(dfull.gA_daily)
-    # plt.title("gA")
-    # plt.subplot(2,3,5)
-    # plt.plot(dfull.cond)
-    # plt.title("g")
-    # plt.subplot(2,3,6)
-    # plt.plot(dfull.LAI)
-    # plt.title("LAI")
-    # plt.suptitle(site_id)
-    # #%%
-    # plt.figure()
-    # plt.plot(row0,et_topred,'o')
-    # plt.title(site_id)
-#%%
- 
 #%%
 all_results = pd.concat(all_results)
 #%%
@@ -658,22 +589,12 @@ ax.set_ylim(0,1.1*ymax)
 ax.set_xlabel("Growing season $D_{max}$ (days)",fontsize=24)
 ax.set_ylabel(r"$\tau$ (days)",fontsize=24)
 
-fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=2 )
+fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=3 )
 #ax.vlines(df_meta.ddrain_mean,df_meta.tau_75,df_meta.tau_25,color="k")
 
 #ax.add_artist(leg1)
 
 #plt.savefig("C:/Users/nholtzma/OneDrive - Stanford/agu 2022/plots for poster/rain_scatter4.svg",bbox_inches="tight")
-#%%
-#allrain = pd.read_csv("year_round_rain_stats.csv")
-#allrain = pd.read_csv("gs_start_rain_stats_maxLAI.csv")
-#df_meta = pd.merge(df_meta,allrain,on="SITE_ID",how='left')
-
-#%%
-# yscaler = np.sqrt(zsoil_mol)
-# molm2_to_mm = 18/1000
-# s2day = 60*60*24
-
 #%%
 import cartopy.crs as ccrs
 import cartopy.feature as cf
@@ -706,7 +627,7 @@ for i in range(len(biome_list)):
 ax.set_xlabel("Average temperature ($^oC)$",fontsize=24)
 ax.set_ylabel("Average annual precip. (cm)",fontsize=24)
 
-fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=2 )
+fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=3 )
 #ax.vlines(df_meta.ddrain_mean,df_meta.tau_75,df_meta.tau_25,color="k")
 #%%
 
@@ -764,7 +685,7 @@ ax.set_ylim(0,1)
 ax.set_xticks(df_meta3.gpp_rank,df_meta3.SITE_ID,rotation=90)
 ax.set_title(r"$R^2$ of GPP given observed g during growing season",fontsize=24)
 fig.tight_layout()
-fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.02),ncols=2)
+fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.02),ncols=3)
 #ax.vlines(df_meta.ddrain_mean,df_meta.tau_75,df_meta.tau_25,color="k")
 #%%
 
@@ -784,37 +705,32 @@ def myplot(ax,x,y,xlab,ylab):
 #%%
 fig,axes=plt.subplots(3,3,figsize=(12,10))
 
-myplot(axes[0,0],df_meta.Aridity,df_meta.tau,
-       "Annual aridity index",r"$\tau$ (days)")
-
-myplot(axes[0,1],df_meta.Aridity_gs,df_meta.tau,
-       "GS aridity index","")
+myplot(axes[2,0],df_meta.Aridity,df_meta.tau,
+       "Annual AI",r"$\tau$ (days)")
+myplot(axes[2,1],df_meta.Aridity_gs,df_meta.tau,
+       "GrowSeas AI","")
+axes[2,2].set_axis_off()
 
 myplot(axes[1,0],df_meta.map_data,df_meta.tau,
        "Annual P (mm/day)",r"$\tau$ (days)")
 
 myplot(axes[1,1],df_meta.gsrain_mean,df_meta.tau,
-       "GS P (mm/day)","")
-
-axes[0,2].set_axis_off()
-
-myplot(axes[2,2],df_meta.ddrain_2mean,df_meta.tau,
-       "GS $D_{mean}$ (days)","")
+       "GrowSeas P (mm/day)","")
 
 myplot(axes[1,2],df_meta.gsrain_len,df_meta.tau,
-       "GS length (days)","")
+       "GrowSeas length (days)","")
 
-
-myplot(axes[2,1],df_meta.fullyear_dmax,df_meta.tau,
-       "Annual $D_{max}$ (days)","")
-
-
-myplot(axes[2,0],df_meta.fullyear_dmean,df_meta.tau,
+myplot(axes[0,0],df_meta.fullyear_dmean,df_meta.tau,
        "Annual $D_{mean}$ (days)",r"$\tau$ (days)")
+myplot(axes[0,1],df_meta.fullyear_dmax,df_meta.tau,
+       "Annual $D_{max}$ (days)","")
+myplot(axes[0,2],df_meta.ddrain_2mean,df_meta.tau,
+       "GrowSeas $D_{mean}$ (days)","")
+
 
 fig.tight_layout()
 
-fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=2 )
+fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=3 )
 #%%
 plt.figure(figsize=(7,7))
 #plt.plot(df_meta.summer_end-df_meta.summer_start,df_meta.ddrain_mean,'o')
@@ -859,66 +775,19 @@ for x in site_pair:
     # c2 = 0.5*c1*np.sqrt(2/tau)
     epred20 = np.clip(term1 + c2*jtab.F,0,np.inf)
     
-    # sm_init = jtab.et2.iloc[0]/jtab.F2.iloc[0]/(2/tau)
-    # smlist = []
-    # etlist = []
-    # s = 1*sm_init
-    # for i in range(len(jtab)):
-    #     smlist.append(s)
-    #     eti = min(s,np.sqrt(2/tau*s*jtab.F2.iloc[i]))
-    #     etlist.append(eti)
-    #     s -= eti
-    
-    # epred20 = etlist
-    
-    #sm_init = jtab.et2.iloc[0]/jtab.F2.iloc[0]/(2/tau)
-    #c1 = np.sqrt(sm_init*4)
-    #sm_pred = 0.25*(-np.sqrt(2/tau)*jtab.G + c1)**2
-    #epred20 = -np.diff(sm_pred)
-    
     tau = 50
     term1 = -1/tau*jtab.F*jtab.G
-    #c2 = (np.nanmean(ej) - np.nanmean(term1))/np.nanmean(f2)
-    #c2 = (np.nanmean(jtab.ET) - np.nanmean(term1))/np.nanmean(jtab.F)
-
+    
     c2 = jtab.ET.iloc[0]/jtab.F.iloc[0]
-    #c2 = 0.5*c1*np.sqrt(2/tau)
-    # sm_init = jtab.et2.iloc[0]/jtab.F2.iloc[0]/(2/tau)
-    # c1 = np.sqrt(sm_init*4)
-    # sm_pred = 0.25*(-np.sqrt(2/tau)*jtab.G + c1)**2
-    # epred50 = -np.diff(sm_pred)
     
     epred50 =  np.clip(term1 + c2*jtab.F,0,np.inf)
     
-    
-    # sm_init = jtab.et2.iloc[0]/jtab.F2.iloc[0]/(2/tau)
-    # smlist = []
-    # etlist = []
-    # s = 1*sm_init
-    # for i in range(len(jtab)):
-    #     smlist.append(s)
-    #     eti = min(s,np.sqrt(2/tau*s*jtab.F2.iloc[i]))
-    #     etlist.append(eti)
-    #     s -= eti
-    
-    # epred50 = etlist
-    
-    
-    #plt.subplot(2,1,si)
     xvar = np.arange(len(jtab.ET))+2
     plt.plot(xvar, np.array(jtab.ET),'ko-',linewidth=3,label="Eddy covariance")
     plt.plot(xvar,epred50,'o-',color="tab:blue",linewidth=3,alpha=0.6,label=r"Model, $\tau$ = 50 days")
     plt.plot(xvar,epred20,'o-',color="tab:orange",linewidth=3,alpha=0.6,label=r"Model, $\tau$ = 20 days")
     if si == 1:
-        #plt.ylabel("ET (mm/day)",fontsize=22)
-        #plt.ylim(-0.1,2)
         plt.legend(fontsize=16)
-    # if si == 2:
-        
-
-    #     plt.xlabel("Day of drydown",fontsize=22)
-    #     plt.ylabel("ET (mm/day)",fontsize=22)
-    #plt.title(x)
     si += 1
 #plt.tight_layout()
 #plt.ylim(-0.1,3.9)
@@ -928,16 +797,6 @@ plt.ylabel("ET (mm/day)",fontsize=22)
 plt.text(1.5,1.25,site_pair[0],fontsize=20)
 plt.text(1.5,2.7,site_pair[1],fontsize=20)
 plt.ylim(-0.1,3)
-
-# sinf = (ej / np.sqrt(fj) / np.sqrt(2/tau))**2
-# s = sinf[0]
-# sirec = np.zeros(len(fj))
-# for i in range(len(fj)):
-#     sirec[i] = s
-#     eti = np.sqrt(2/tau*s*fj[i])
-#     s -= eti
-# etrec = np.sqrt(sirec * 2/tau * fj)
-#%%
 
 #%%
 plt.figure(figsize=(10,8))
@@ -968,17 +827,19 @@ biome_diff = anova_lm(smf.ols("tau_ddreg ~ C(combined_biome)",data=df_meta).fit(
 #%%
 # plt.figure()
 # xi = 0
+col_use = "smcend"
 site_10  = []
 cols0 = []
 cols1 = []
+t_out = []
 for x in pd.unique(site_dd_limit.SITE_ID):
     dfx = site_dd_limit.loc[site_dd_limit.SITE_ID==x].copy()
-    dfx0 = dfx.loc[dfx.wl==0].copy().dropna()
-    dfx1 = dfx.loc[dfx.wl==1].copy().dropna()
+    dfx0 = dfx.loc[dfx.wl==0].copy().dropna()[col_use]
+    dfx1 = dfx.loc[dfx.wl==1].copy().dropna()[col_use]
     if len(dfx0) >= 10 and len(dfx1) >= 10:
-        #t_out.append(scipy.stats.ttest_ind(dfx0.smc0, dfx1.smc0, equal_var=False))
-        cols0.append(np.array(dfx0.smc0))
-        cols1.append(np.array(dfx1.smc0))
+        t_out.append(scipy.stats.ttest_ind(dfx0, dfx1, equal_var=False))
+        cols0.append(np.array(dfx0))
+        cols1.append(np.array(dfx1))
         site_10.append(x)
 #%%
 plt.figure()
@@ -991,170 +852,16 @@ plt.ylabel("Drydown initial soil moisture")
 plt.xlabel("Site")
 plt.xticks(range(len(site_10)), site_10, rotation=90);  
 #%%
-# def tofit(pars):
-#     a1,s,bP,bL = pars
-#     gpred = 2.3*(dfday.LAI)**bL*(dfday.par/250)**bP*a1*(1-np.exp(-dfday.cond2/2.3/(dfday.LAI/2.3)**bL/(dfday.par/250)**bP/a1*s))
-#     return dfday.gpp - gpred
-# fit0 = np.array([5,85,0.4,1])
-# myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))
-#%%
-# def tofit(pars):
-#     a1,s,bP= pars
-#     gpred = dfday.LAI*(dfday.par/250)**bP*a1*(1-np.exp(-dfday.cond2/(dfday.LAI)/(dfday.par/250)**bP/a1*s))
-#     return dfday.gpp - gpred
-# fit0 = np.array([5,85,0.4])
-# myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))
-
-# a1,s,bP= myfit.x
-# gpred = dfday.LAI*(dfday.par/250)**bP*a1*(1-np.exp(-dfday.cond2/(dfday.LAI)/(dfday.par/250)**bP/a1*s))
-# dfday["gpp_pred1"] = gpred
-# dfday["logerr"] = np.log(dfday.gpp/dfday["gpp_pred1"])
-# sitemed = dfday.groupby("SITE_ID").median(numeric_only=True).reset_index()
-# gpred2 = np.exp(dfday2.logerr_y)*dfday2.LAI*(dfday2.par/250)**bP*a1*(1-np.exp(-dfday2.cond2/(dfday2.LAI)/(dfday2.par/250)**bP/a1*s))
-# #%%
-
-#%%
-# def tofit(pars):
-#     a1,s,bP,bP2= pars
-#     gpred = dfday.LAI*(dfday.par/250)**bP*a1*(1-np.exp(-dfday.cond2/(dfday.LAI)/(dfday.par/250)**bP2/a1*s))
-#     return dfday.gpp - gpred
-# fit0 = np.array([5,85,0.4,0.4])
-# myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))
-#%%
-# plt.figure()
-# plt.plot(dfull.cond2/dfull.gA_hourly, dfull.gpp/dfull.amax_hourly,'.')
-# plt.plot(dfull.cond2/dfull.gA_daily, dfull.gpp/dfull.amax_daily,'.')
-# plt.plot(dfull.cond2/dfull.gA_d2, dfull.gpp/dfull.amax_d2,'.')
-# plt.xlim(0,7)
-# plt.ylim(0,1.5)
-#%%
-# plt.figure()
-# for i in range(len(et_plain2)):
-#     x = et_plain2[i]
-#     y = et_plain2[i]#/(vpd_plain2[i])
-#     #y = (vpd_plain2[i])
-
-#     # plt.plot(np.cumsum(x)-x[0], y/y[0],'bo-',alpha=0.5)
-# #    plt.plot(y/y[0],'bo-',alpha=0.5)
-#     plt.plot(np.log(y) - np.log(y)[0],'bo-',alpha=0.5)
-
-# for i in range(len(et_plain)):
-#     x = et_plain[i]
-#     y = et_plain[i]#/(vpd_plain[i])
-#     #y = vpd_plain[i]
-
-#     #plt.plot(np.cumsum(x)-x[0], y/y[0],'ro-',alpha=0.5)
-# #    plt.plot(y/y[0],'ro-',alpha=0.5)
-#     plt.plot(np.log(y) - np.log(y)[0],'ro-',alpha=0.5)
-
-# #%%
-
-#%%
-# x_all = []
-# y_all = []
-
-# plt.figure()
-# for i in range(len(et_plain2)):
-#     x = et_plain2[i]
-#     y = et_plain2[i]/np.sqrt(vpd_plain2[i]*np.array(krec2[i]))
-#     #x = np.array(krec2[i])
-#     #y = et_plain2[i]
-# #    plt.plot(np.cumsum(x)-x[0], y/y[0],'bo-',alpha=0.5)
-#     #plt.plot(np.cumsum(x)-x[0],'bo-',alpha=0.5)
-#     # plt.plot(y-y[0],'bo-',alpha=0.5)
-# #    plt.plot(x/x[0],y/y[0],'bo-',alpha=0.5)
-#     plt.plot(np.log(y) - np.log(y)[0],'bo-',alpha=0.5)
-#     #plt.plot(np.cumsum(x),np.log(y) - np.log(y)[0],'bo-',alpha=0.5)
-# for i in range(len(et_plain)):
-#     x = et_plain[i]
-#     y = et_plain[i]/np.sqrt(vpd_plain[i]*np.array(krec1[i])*mol_s_to_mm_day)
-#     #plt.plot(np.cumsum(x)-x[0],'ro-',alpha=0.5)
-#     #plt.plot(y-y[0],'ro-',alpha=0.5)
-
-#     #x = np.array(krec2[i])
-#     #y = et_plain2[i]
-#     #plt.plot(np.cumsum(x)-x[0], y/y[0],'ro',alpha=0.5)
-#     #plt.plot(np.log(np.arange(len(y))+2),np.log(y) - np.log(y)[0],'ro',alpha=0.5)
-#     plt.plot((np.cumsum(x)-x[0])/(np.std(np.cumsum(x))),(y**2-y[0]**2)/(np.std(np.cumsum(x))),'ro',alpha=0.5)
-#     x_all += list((np.cumsum(x)-x[0])/(np.std(np.cumsum(x))))
-#     y_all += list((y**2-y[0]**2)/(np.std(np.cumsum(x))))
-    
-#     # plt.plot((np.cumsum(x)-x[0])/(np.sum(x)-x[0]),(y**2-y[0]**2)/(np.sum(x)-x[0]),'ro',alpha=0.5)
-#     # x_all += list((np.cumsum(x)-x[0])/(np.sum(x)-x[0]))
-#     # y_all += list((y**2-y[0]**2)/(np.sum(x)-x[0]))
-
-# plt.ylim(-1,1)
-# plt.plot([0,3],[0,3* -2/74])
-#%%
-# #    plt.plot(x/x[0],y/y[0],'bo-',alpha=0.5)
-# # #%%
-# # normc = dfull.ET/np.sqrt(dfull.vpd*dfull.kgpp)
-# # normc[dfull.rain > 0] = np.nan
-# # normc[dfull.rain_prev > 0] = np.nan
-# # normc[dfull.vpd < 0.5] = np.nan
-# # dfull["smcq"] = np.interp(dfull.smc,np.sort(dfull.smc),np.linspace(0,1,len(dfull)))
-# #%%
-# xlist = []
-# ylist = []
-# taulist = np.zeros(len(et_plain))
-# for i in range(len(et_plain)):
-#     try:
-#         x = et_plain[i]
-#         x2 = np.interp(np.arange(len(x)),np.arange(len(x))[np.isfinite(x)], x[np.isfinite(x)])
-#         y = et_plain[i]/np.sqrt(vpd_plain[i]*np.array(krec1[i]))
-#         smod = sm.OLS(1-(y/y[0])**2,np.cumsum(x2)-x2[0],missing='drop').fit()#.summary()
-#         s0 = 1/smod.params[0]
-#         spred = s0 - (np.cumsum(x2)-x2[0])
-#         z = np.sqrt(spred*vpd_plain[i]*np.array(krec1[i]*mol_s_to_mm_day))
-#         tmod = sm.OLS(x,z,missing="drop").fit()
-#         taulist[i] = 2/tmod.params[0]**2
-        
-#         xlist += list(z)
-#         ylist += list(x)
-        
-#     except:
-#         taulist[i] = np.nan
-# #%%
-# xlist2 = []
-# ylist2 = []
-# taulist2 = np.zeros(len(et_plain2))
-# for i in range(len(et_plain2)):
-#     try:
-#         x = et_plain2[i]
-#         x2 = np.interp(np.arange(len(x)),np.arange(len(x))[np.isfinite(x)], x[np.isfinite(x)])
-#         y = et_plain2[i]/np.sqrt(vpd_plain2[i]*np.array(krec2[i]))
-#         smod = sm.OLS(1-(y/y[0])**2,np.cumsum(x2)-x2[0],missing='drop').fit()#.summary()
-#         s0 = 1/smod.params[0]
-#         # ynorm = y/y[0]
-#         # srange = np.linspace(np.sum(x2),2000,500)
-#         # myerr = [] #0*srange
-#         # for s0 in srange:
-#         #     spred = s0 - (np.cumsum(x2)-x2[0])
-#         #     ypred = np.sqrt(spred/s0)
-#         #     myerr.append(np.nanmean(np.abs(ypred-ynorm)))
-        
-#         #smod = sm.OLS((y/y[0])**2,sm.add_constant(np.cumsum(x2)),missing='drop').fit()
-#         #s0 = -1/smod.params[1]
-#         spred = s0 - (np.cumsum(x2)-x2[0])
-#         z = np.sqrt(spred*vpd_plain2[i]*np.array(krec2[i]*mol_s_to_mm_day))
-#         tmod = sm.OLS(x,z,missing="drop").fit()
-#         taulist2[i] = 2/tmod.params[0]**2
-        
-#         xlist2 += list(z)
-#         ylist2 += list(x)
-#     except:
-#         taulist2[i] = np.nan
-#%%
-# df_meta= df1b.loc[df1b.tau_fullreg_hi > 0]
-# df_meta= df_meta.loc[df_meta.tau_fullreg_lo > 0]
-# df_meta= df_meta.loc[df_meta.tau_fullreg > 0]
-# # #%%
-# df_meta= df1b.loc[df1b.tau_simult_hi > 0]
-# df_meta= df_meta.loc[df_meta.tau_simult_lo > 0]
-# df_meta= df_meta.loc[df_meta.tau_simult > 0]
-# # #%%
-# # df_meta = df_meta.loc[(df_meta.tau_climreg_hi-df_meta.tau_climreg_lo)/df_meta.tau_climreg < 2]
-# # #%%
-# df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 > 0.05].copy()
-# df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 < 0.95].copy()
-# #%%
+site_year2 = all_results.groupby("SITE_ID").nunique().reset_index()
+site_year2["N_year"] = site_year2.year
+df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
+'LOCATION_LAT','LOCATION_LONG','LOCATION_ELEV',
+'gsrain_len','map_data','gsrain_mean','mat_data',
+'Aridity','Aridity_gs',
+'fullyear_prain','gs_prain',
+'fullyear_dmax','fullyear_dmean','seas_rain_mean0','seas_rain_max0',
+'gppR2_exp','reg_ndd','reg_npoints',
+'tau_ddreg','tau_ddreg_lo','tau_ddreg_hi',
+'etr2_norm','gr2_norm']].copy()
+df_export = pd.merge(df_export,site_year2[["SITE_ID","N_year"]],on="SITE_ID",how="left")
+#df_export["ddlen_mean"] = df_export.reg_ndd/df_export.reg_npoints
