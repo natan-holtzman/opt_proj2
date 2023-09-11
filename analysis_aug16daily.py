@@ -87,7 +87,7 @@ site_dd_limit = []
 #%%
 all_results = []
 ddlist = []
-
+all_results0 = []
 for site_id in pd.unique(bigyear.SITE_ID):
     #%%
     #if site_id=="ZM-Mon":
@@ -146,31 +146,53 @@ for site_id in pd.unique(bigyear.SITE_ID):
 
 
     dfull["cond2"] = dfull.ET/np.clip(dfull.vpd_daytime,0.1,np.inf)*100
-
     #%%
-
+    # dfull.loc[dfull.rain != 0, "gpp_pred_daily"] = np.nan
+    # dfull.loc[dfull.rain_prev != 0, "gpp_pred_daily"] = np.nan
+    # dfull.loc[dfull.vpd <= 0.5 , "gpp_pred_daily"] = np.nan
+    
+    # dfull.loc[dfull.rain != 0, "gpp_pred_hourly"] = np.nan
+    # dfull.loc[dfull.rain_prev != 0, "gpp_pred_hourly"] = np.nan
+    # dfull.loc[dfull.vpd <= 0.5 , "gpp_pred_hourly"] = np.nan
+    
+    #%%
+    dfull["gpp_assess"] = 1*dfull.gpp
+    dfull.loc[dfull.rain != 0, "gpp_assess"] = np.nan
+    dfull.loc[dfull.rain_prev != 0, "gpp_assess"] = np.nan
+    dfull.loc[dfull.vpd <= 0.5 , "gpp_assess"] = np.nan
+    #%%
+    
+    # def sfun(x):
+    #     y = x*dfull.amax_hourly*(1-np.exp(-dfull.cond2/dfull.gA_hourly/x))
+    #     return -r2_skipna(y,dfull.gpp_assess)
+    # sres = scipy.optimize.minimize_scalar(sfun, bounds = [0.5,2])
+        
+    # gfac = sres.x
+    # dfull["gfac"] = gfac
+    # dfull.amax_hourly *= gfac
+    # dfull.gA_hourly *= gfac
+    
     dfull["gpp_pred_hourly"] = dfull.amax_hourly*(1-np.exp(-dfull.cond2/dfull.gA_hourly))
     dfull["gpp_pred_daily"] = dfull.amax_daily*(1-np.exp(-dfull.cond2/dfull.gA_daily))
     
-    dfull["kgpp"] = dfull.gA_daily
+    dfull["kgpp"] = dfull.gA_hourly
     #%%
-    dfull.loc[dfull.rain != 0, "gpp_pred_daily"] = np.nan
-    #dfull.loc[dfull.rain_prev != 0, "gpp_pred_daily"] = np.nan
-    dfull.loc[dfull.vpd <= 0.5 , "gpp_pred_daily"] = np.nan
-    
-    
-    dfull["gppR2_exp"] = r2_skipna(dfull.gpp_pred_daily,dfull.gpp)
+    dfull["gppR2_exp_daily"] = r2_skipna(dfull.gpp_pred_daily,dfull.gpp_assess)
+    dfull["gppR2_exp_hourly"] = r2_skipna(dfull.gpp_pred_hourly,dfull.gpp_assess)
+    dfull["gppR2_exp"] = dfull["gppR2_exp_hourly"]
     # if r2_skipna(dfull.gpp_pred_d2,dfull.gpp) < 0:
     #     site_message.append("GPP model did not fit")
     #     continue
+    #%%
     
-    #smin_mm = -500
-    #tauDay = 50
     #%%
     dfGS = dfull.loc[dfull.is_summer].copy()
     dfull["gsrain_mean"] = np.mean(dfGS.rain)
     
     dfull["gs_prain"] = np.mean(dfGS.rain > 0)
+
+    all_results0.append(dfull[["SITE_ID","gppR2_exp_daily","gppR2_exp_hourly"]])
+
 
 #    dfGS = dfull.copy()
     #dfGS["cond_per_LAI"] = dfGS.cond/dfGS.LAI
@@ -236,6 +258,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
     
     cond1=[]
     cond2=[]
+    
+    individual_slopes = []
     
     #%%
     for y0 in pd.unique(dfGS.year_new):
@@ -348,10 +372,13 @@ for site_id in pd.unique(bigyear.SITE_ID):
                 et_init.append(dfy.ET.iloc[starti])             
 
                 slopelist.append(rDD.params[1])
-                if rDD.rsquared > 0.25 and rDD.params[1] < 0:
-                
+                #if rDD.rsquared > 0.01 and rDD.params[1] < 0:
+                if rDD.params[1] < 0:
+
+                    #if rDD.pvalues[1] < 0.05 and rDD.params[1] < 0:
                 #if True: #rDD.params[1] < 0:
                 #if smc_avg[-1] < 22.7:
+                    individual_slopes.append([rDD.params[1]]*len(yfull))
                     is_limited.append(1)
                     ddlabel.append([ddii]*len(yfull))
                     ddyears.append([y0]*len(yfull))
@@ -452,6 +479,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
                          "VPD":np.concatenate(vpd_plain),
                          "etcum":np.concatenate(etcum),
                          "year":np.concatenate(ddyears),
+                         "ddslopes":np.concatenate(individual_slopes),
                          "ddlen":np.concatenate([[len(x)]*len(x) for x in vpd_plain])})
     #%%
     btab["cond"] = btab.ET/btab.VPD
@@ -509,6 +537,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
     
 #%%
 all_results = pd.concat(all_results)
+all_results0 = pd.concat(all_results0)
+
 #%%
 site_dd_limit = pd.concat(site_dd_limit)
 #%%
@@ -517,6 +547,7 @@ site_year = np.array(all_results.groupby("SITE_ID").nunique()["year"])
 
 #%%
 df1 = all_results.groupby("SITE_ID").first().reset_index()
+df0 = all_results0.groupby("SITE_ID").first().reset_index()
 
 #%%
 def qt_gt1(x,q):
@@ -532,10 +563,12 @@ df_meta= df1b.loc[df1b.tau_ddreg > 0]
 df_meta = pd.merge(df_meta,metadata,left_on="SITE_ID",right_on="fluxnetid",how="left")
 #%%
 
-df_meta = df_meta.loc[df_meta.tau_ddreg_lo > 0]
-df_meta = df_meta.loc[df_meta.tau_ddreg_hi > 0]
+#df_meta = df_meta.loc[df_meta.tau_ddreg_lo > 0]
+#df_meta = df_meta.loc[df_meta.tau_ddreg_hi > 0]
 #%%
+df_meta = df_meta.loc[(df_meta.tau_ddreg_hi-df_meta.tau_ddreg_lo) < 100]
 
+#%%
 df_meta = df_meta.loc[df_meta.reg_ndd >= 3].copy()
 
 #%%
@@ -757,10 +790,20 @@ for x in site_pair:
     #plt.subplot(2,1,si)
     tabS = ddlist.loc[ddlist.SITE_ID==x].copy()
     tabS = tabS.loc[tabS.year >= 2001].copy()
-    ddlens = tabS.groupby("ddi").count().reset_index()
+    tabS = tabS.loc[tabS.ddlen >= 10].copy()
+    #ddlens = tabS.groupby("ddi").count().reset_index()
     #longDD = np.argmax(ddlens.et_per_F_dm)
-    longDD = np.argmin(np.abs(ddlens.et_per_F_dm-17))
-    
+    #longDD = np.argmin(np.abs(ddlens.et_per_F_dm-18))
+    ddfirst = tabS.groupby("ddi").first().reset_index()
+    #longDD = np.argmax(ddlens.et_per_F_dm)
+    #longDD = np.argmin(np.abs(ddlens.et_per_F_dm-18))
+    if x=="US-Me5":
+        longDD = ddfirst.loc[np.abs(ddfirst.ET-1) < 0.1].ddi.iloc[0]
+        #np.argmin(np.abs(ddfirst.ET-1))
+    if x=="US-SRM":
+        longDD = ddfirst.loc[np.abs(ddfirst.ET-2.2) < 0.1].ddi.iloc[0]
+
+        #longDD = np.argmin(np.abs(ddfirst.ET-2.2))
     jtab = tabS[tabS.ddi==longDD].reset_index()
     istart = np.where(np.isfinite(jtab.ET))[0][0]
     jtab = jtab.iloc[istart:].copy()
@@ -859,9 +902,32 @@ df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
 'gsrain_len','map_data','gsrain_mean','mat_data',
 'Aridity','Aridity_gs',
 'fullyear_prain','gs_prain',
-'fullyear_dmax','fullyear_dmean','seas_rain_mean0','seas_rain_max0',
+'fullyear_dmax','fullyear_dmean','seas_rain_max0','seas_rain_mean0',
 'gppR2_exp','reg_ndd','reg_npoints',
 'tau_ddreg','tau_ddreg_lo','tau_ddreg_hi',
 'etr2_norm','gr2_norm']].copy()
 df_export = pd.merge(df_export,site_year2[["SITE_ID","N_year"]],on="SITE_ID",how="left")
 #df_export["ddlen_mean"] = df_export.reg_ndd/df_export.reg_npoints
+#%%
+ddlist2 = ddlist.loc[ddlist.SITE_ID.isin(df_meta.SITE_ID)].copy()
+ddlist2["site_dd"] = ddlist2.SITE_ID + ddlist2.ddi.astype(str)
+#%%
+#ddimod = smf.ols("et_per_F_dm ~ 0 + C(site_dd):row0",data=ddlist2,missing="drop").fit()
+#%%
+ddmean = ddlist2.groupby("site_dd").first().reset_index()
+#%%
+site_id="US-Blo"
+ddsite = ddmean.loc[ddmean.SITE_ID==site_id].copy()
+ddsite_full = ddlist2.loc[ddlist2.SITE_ID==site_id].copy()
+#%%
+plt.figure()
+plt.plot(ddsite.ddlen,-2/ddsite.ddslopes,'o')
+plt.plot([0,np.max(ddsite.ddlen)],[0,np.max(ddsite.ddlen)])
+plt.ylim(0,200)
+#ddlist2 = ddlist2.loc[ddlist2.ddlen < 40].copy()
+# taumod = smf.ols("et_per_F_dm ~ 0 + C(SITE_ID):row0",data=ddlist2,missing="drop").fit()
+# #%%
+# lenmod = smf.ols("et_per_F_dm ~ ddlen*row0",data=ddlist2,missing="drop").fit()
+# taulenmod = smf.ols("et_per_F_dm ~ C(SITE_ID):row0 + ddlen*row0",data=ddlist2,missing="drop").fit()
+# #%%
+# dlen_diff = anova_lm(taulenmod)
