@@ -37,41 +37,10 @@ plt.rcParams["mathtext.default"] = "sf"
 
 import matplotlib.dates as mdates
 myFmt = mdates.DateFormatter('%b %Y')
-#%%s
-#latsort = bif_forest.sort_values("LOCATION_LAT")
 #%%
-def find_peaks(x):
-    peaklocs = np.where((x[1:-1] >= x[:-2])*(x[1:-1] >= x[2:]))[0] + 1
-    return peaklocs
-#if there is only one peak, we're good
-#if there are two peaks, check how much lower the middle trough is
-
-def find_valleys(x):
-    valleys = np.where((x[1:-1] <= x[:-2])*(x[1:-1] <= x[2:]))[0] + 1
-    return valleys
-
-def wrap_min(x):
-    minday = np.argmin(x)
-    x2 = 0*x
-    chunk1 = x[:minday]
-    chunk2 = x[minday:]
-    x2[:len(chunk2)] = 1*chunk2
-    x2[len(chunk2):] = 1*chunk1
-    return x2
-
-
-def make_1peak(x1):
-    x2 = 0*x1
-    topday = np.argmax(x1)
-    x2[topday] = x1[topday]
-    
-    for i in range(topday+1,len(x1)):
-        x2[i] = min(x2[i-1],x1[i])
-    for i in range(topday-1,-1,-1):
-        x2[i] = min(x2[i+1],x1[i])
-    return x2
-#test_sites = np.array(latsort.SITE_ID)[::5]
-#%%
+def r2_skipna(pred,obs):
+    goodxy = np.isfinite(pred*obs)
+    return 1 - np.mean((pred-obs)[goodxy]**2)/np.var(obs[goodxy])
 #all_daily = pd.read_csv("all_yearsites_2gpp.csv",parse_dates=["date"])
 all_daily = pd.read_csv("dailydata_aug21.csv",parse_dates=["date"])
 
@@ -110,16 +79,7 @@ for site in bif_forest.SITE_ID:
     #%%
     
     dfull["LAI"] = np.clip(dfull["LAI"],0.05,np.inf)
-    #dfull["LAIdiff"] = [0] + list(np.diff(dfull.LAI))
-
-    #gpp_clim = np.array(dclim.gpp)
-    # year95 = dfull.groupby("year_new").max(numeric_only=True).reset_index()
-
-    # #year95["gpp_y95"] = 1*year95["gpp_smooth"]
-    # year95["lai_y95"] = 1*year95["LAI"]
-    # dfull = pd.merge(dfull,year95[["year_new","lai_y95"]],how="left",on="year_new")
-    # dfull["LAI_gt50"] = dfull.LAI/dfull.lai_y95 > 0.5
-    #dfull["gpp"] = np.clip((dfull.gpp_nt + dfull.gpp_dt)/2,0,np.inf)
+   
     #%%
     df[df == -9999] = np.nan
     
@@ -139,41 +99,6 @@ for site in bif_forest.SITE_ID:
 #%%
     #df["LAI_gt50"] = (df.gpp_smooth/df.gpp_y95) > 0.67
     year_list = pd.unique(dfull.year_new)
-    
-    
-    #%%
-    gs_starts = []
-    gs_ends = []
-    for year in year_list:
-        dfy = dfull.loc[dfull.year_new==year].reset_index()
-        topday = np.argmax(dfy.LAI)
-        
-        yearclim = (dfy.LAI-np.nanmin(dfy.LAI))/(np.nanmax(dfy.LAI)-np.nanmin(dfy.LAI))
-        #yearclim = (dfy.LAI)/(np.nanmax(dfy.LAI))
-        #yearclim = (dfy.gpp)/(np.nanmax(dfy.gpp))
-
-#        topday = np.argmax(dfy.gpp_smooth)
-        under50 = np.where(yearclim < 0.75)[0]
-        #under50 = np.where(~dfy.LAI_gt50)[0]
-        try:
-            summer_start = under50[under50 < topday][-1] + 1
-        except:
-            summer_start = 0
-        try:
-            summer_end = under50[under50 > topday][0] -1
-        except:
-            summer_end = 365
-        gs_starts.append(summer_start)
-        gs_ends.append(summer_end)
-        
-    summer_df = pd.DataFrame({"year_new":year_list,
-                              "summer_start":gs_starts,
-                              "summer_end":gs_ends})
-    dfull= pd.merge(dfull,summer_df,on="year_new",how="left")
-    
-    is_summer = np.array((dfull.doy >= dfull.summer_start)*(dfull.doy <= dfull.summer_end))
-    
-#    gpp_clim_std = np.array(dclim.LAI-np.nanmin(dclim.LAI))/(np.nanmax(dclim.LAI)-np.nanmin(dclim.LAI))
     #%%
     if len(dfull) == 0:
         continue
@@ -181,7 +106,6 @@ for site in bif_forest.SITE_ID:
     dclim = dfull.groupby("doy").mean(numeric_only=True).reset_index()
 #%%
     gpp_clim_std = np.array(dclim.LAI)/(np.nanmax(dclim.LAI))
-    #gpp_clim_std = np.array(dclim.LAI-np.nanmin(dclim.LAI))/(np.nanmax(dclim.LAI)-np.nanmin(dclim.LAI))
 
     topday = np.argmax(gpp_clim_std)
     under50 = np.where(gpp_clim_std < 0.75)[0]
@@ -194,27 +118,12 @@ for site in bif_forest.SITE_ID:
     except:
         clim_summer_end = 365
     dfull["clim_summer"] = (dfull.doy >= clim_summer_start)*(dfull.doy <= clim_summer_end)
-    #is_summer *= clim_summer
     #%%
-  
-    #%%
-#    daily_gs = dfull.loc[is_summer*dfull.clim_summer].copy()
-    
     daily_gs = dfull.loc[dfull.clim_summer].copy()
-    
-    #daily_gs = daily_gs.loc[daily_gs.LAI >= np.nanmedian(dfull.LAI)].copy()
-    #daily_gs = dfull.loc[is_summer].copy()
-
-    #daily_gs = daily_gs.loc[daily_gs.year_new >= 2001]
     
     daily_gs["date"] = daily_gs["date"].dt.date
     #%%
-    
-    
-    #%%
     df = pd.merge(df,daily_gs[["date","LAI"]],on="date",how="inner")
-    #%%
-    
     #%%
     dfday = df.loc[df.PPFD_in > 100].copy()
     dfday = dfday.loc[dfday.VPD > 0.5].copy()
@@ -237,9 +146,6 @@ for site in bif_forest.SITE_ID:
 #%%
     if len(dfday) < 25:
         continue
-#%% 
-    
-    #%%
     dfday["cond_norm"] = dfday.cond/dfday.LAI
     dfday["gpp_norm"] = dfday.gpp/dfday.LAI
 
@@ -262,21 +168,13 @@ for site in bif_forest.SITE_ID:
     
     gA = gmax1*dfday.PPFD_in/(dfday.PPFD_in + kG)
     z1 = 1-np.exp(-dfday.cond_norm/gA)
+    amax = amax1*dfday.PPFD_in/(dfday.PPFD_in + kA)
+    gpp_pred_h = dfday.LAI*amax*(1-np.exp(-dfday.cond_norm/gA))
     #%%
     df["gA_hourly"] = gmax1*df.PPFD_in/(df.PPFD_in + kG) * df.LAI
     df["amax_hourly"] = amax1*df.PPFD_in/(df.PPFD_in + kA) * df.LAI
-    df["gpp_pred_hourly"] = df["amax_hourly"] * (1 - np.exp(-df.cond/df["gA_hourly"]))
+    df["gpp_pred_from_hourly"] = df["amax_hourly"] * (1 - np.exp(-df.cond/df["gA_hourly"]))
     #%%
-    # gpp2 = np.array(df.gpp)
-    # for hi in range(24):
-    #     z = gpp2[hi::24]*1
-    #     z2 = np.interp(np.arange(len(z)), np.arange(len(z))[np.isfinite(z)], z[np.isfinite(z)])
-    #     gpp2[hi::24] = z2
-    
-    # df["gpp_interp"] = gpp2
-    
-    #%%
-#    daytime_avg = df.loc[df.NIGHT==0].groupby("date").mean(numeric_only=True).reset_index()
     daytime_avg = df.loc[df.PPFD_in >= 100].groupby("date").mean(numeric_only=True).reset_index()
     #%%
     df["day100"] = df.PPFD_in >= 100
@@ -299,12 +197,11 @@ for site in bif_forest.SITE_ID:
     dailydf["gpp_pred_daily"] = dailydf["amax_daily"] * (1 - np.exp(-dailydf.cond_daily_dayVPD/dailydf["gA_daily"]))
     #%%
     dailydf["gpp_pred_hourly2"] = dailydf["amax_hourly"] * (1 - np.exp(-dailydf.cond_daily_dayVPD/dailydf["gA_hourly"]))
-    
 
-    #%%
 #    gs2 = pd.merge(daily_gs,dailydf[["date","gpp_interp","daytime_airt","daytime_par","NIGHT","cond_daytime","vpd_daytime","P_F_QC"]],on="date",how="left")
     gs2 = pd.merge(daily_gs,dailydf[["date","daytime_airt","daytime_par","NIGHT","cond_daytime","vpd_daytime","P_F_QC",
                                      "gA_hourly","gA_daily","amax_hourly","amax_daily"]],on="date",how="left")
+    gs2["gppR2_hourly"] = r2_skipna(gpp_pred_h,dfday.gpp)
 
 #%%
     dfull = gs2.copy()
@@ -312,9 +209,6 @@ for site in bif_forest.SITE_ID:
     dfull["gpp_fit_frac_above9"] = np.mean(z1 > 0.9)
     site_tab.append(dfull)
 #%%
-
 site_tab = pd.concat(site_tab).reset_index()
-#%%
 
-#%%
-site_tab.to_csv("data_with_daytime_aug28b.csv")
+site_tab.to_csv("data_with_daytime_sept13.csv")
