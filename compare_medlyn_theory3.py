@@ -171,8 +171,10 @@ fig.colorbar(pcm, ax=ax,label="$g_{INT}-g_{MED}$ $(mol/m^2/s)$")
 #ax.colorbar()
 
 ax = axes[2,1]
-ax.plot(new_opt_g.reshape(-1,1),med_g.reshape(-1,1),'.')
-ax.plot([0,0.6],[0,0.6],linewidth=3)
+ax.plot([0,0.6],[0,0.6],'k',linewidth=3,alpha=0.67)
+
+ax.plot(new_opt_g.reshape(-1,1),med_g.reshape(-1,1),'.',color='tab:green',markersize=8,alpha=0.5)
+
 ax.set_xlabel("$g_{INT}$ $(mol/m^2/s)$")
 ax.set_ylabel("$g_{MED}$ $(mol/m^2/s)$")
 ax.set_title("(f)",loc="left")
