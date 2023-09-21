@@ -171,13 +171,31 @@ fig.colorbar(pcm, ax=ax,label="$g_{INT}-g_{MED}$ $(mol/m^2/s)$")
 #ax.colorbar()
 
 ax = axes[2,1]
-ax.plot([0,0.6],[0,0.6],'k',linewidth=3,alpha=0.67)
+ax.plot([0,0.6],[0,0.6],'k--',linewidth=6,alpha=0.67,label="1:1 line")
 
-ax.plot(new_opt_g.reshape(-1,1),med_g.reshape(-1,1),'.',color='tab:green',markersize=8,alpha=0.5)
+ax.plot(new_opt_g.reshape(-1,1),med_g.reshape(-1,1),'.',color='tab:green',markersize=10,alpha=0.5)
 
 ax.set_xlabel("$g_{INT}$ $(mol/m^2/s)$")
 ax.set_ylabel("$g_{MED}$ $(mol/m^2/s)$")
 ax.set_title("(f)",loc="left")
 
+ax.legend()
 
 plt.tight_layout(w_pad=2)
+#%%
+vpd_const = 1
+tau_day = 30
+tau_s = tau_day*(60*60*24)
+zsoil_mol = 1000*1000/18
+s_sw_range = np.linspace(0.01,0.3,500)
+new_opt_g = np.sqrt(2/tau_s*vmax/slope_at_0*zsoil_mol*s_sw_range/(vpd_const/100))
+new_opt_A = vmax*(1-np.exp(-new_opt_g/(vmax/slope_at_0)))
+WUE = new_opt_A/(new_opt_g)
+#%%
+
+plt.figure()
+plt.plot(s_sw_range*zsoil_mm,WUE,linewidth=3)
+plt.xlim(0,300)
+plt.ylim(30,90)
+plt.xlabel("s - $s_w$ (mm)")
+plt.ylabel("iWUE ($\mu$mol $CO_2$/mol $H_2 O$)")

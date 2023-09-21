@@ -24,7 +24,10 @@ if do_bif:
 #%%
 def cor_skipna(x,y):
     goodxy = np.isfinite(x*y)
-    return scipy.stats.pearsonr(x[goodxy],y[goodxy])
+    try:
+        return scipy.stats.pearsonr(x[goodxy],y[goodxy])
+    except:
+        return (np.nan,np.nan)
 def rho_skipna(x,y):
     goodxy = np.isfinite(x*y)
     return scipy.stats.spearmanr(x[goodxy],y[goodxy])
@@ -190,7 +193,13 @@ for site_id in pd.unique(bigyear.SITE_ID):
     #     site_message.append("GPP model did not fit")
     #     continue
     #%%
-    
+    # sret = dfull.ET**2 / dfull.vpd / dfull.kgpp
+    # sret[np.isnan(dfull.gpp_assess)] = np.nan
+    # sret[dfull.par < 100] = np.nan
+    # sret = np.array(sret)
+    # smcarr = np.array(dfull.smc)
+    # strans = np.interp(smcarr, np.sort(smcarr[np.isfinite(sret*smcarr)]), np.sort(sret[np.isfinite(sret*smcarr)]))
+    # etret = np.sqrt(strans * dfull.vpd * dfull.kgpp)
     #%%
     dfGS = dfull.loc[dfull.is_summer].copy()
     dfull["gsrain_mean"] = np.mean(dfGS.rain)
@@ -221,6 +230,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
     
     etcum = []
     ddyears = []
+    smclist = []
     
     ddall = 0
     
@@ -322,7 +332,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
                 smc_avg.append(np.mean(dfy.smc.iloc[starti:endi]))
 
                 etcumDD = np.array([0] + list(np.cumsum(etsel-rainsel)))[:-1]
-
+                #etcumDD = np.cumsum(etsel-rainsel)
+                #etcumDD -= etcumDD[0]
                 rDD = sm.OLS(yfull,sm.add_constant(etcumDD),missing='drop').fit()
 
                 if rDD.params[1] < 0:
@@ -334,6 +345,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
                     grec.append(g_of_t)
                     vpd_plain.append(vpd_arr[starti:endi])
                     et_plain.append(et_mmday[starti:endi])
+                    smclist.append(dfy.smc.iloc[starti:endi])
                     
                     etcum.append(etcumDD)
                     
@@ -397,6 +409,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
                          "F":np.concatenate(frec),
                          "VPD":np.concatenate(vpd_plain),
                          "etcum":np.concatenate(etcum),
+                         "smc":np.concatenate(smclist),
+
                          "year":np.concatenate(ddyears),
                          "ddslopes":np.concatenate(individual_slopes),
                          "ddlen":np.concatenate([[len(x)]*len(x) for x in vpd_plain])})
@@ -414,7 +428,9 @@ for site_id in pd.unique(bigyear.SITE_ID):
     #%%
     
     #%%
+#    dmod = smf.ols("etnorm ~ 0 + etcum + C(ddi)",data=btab[btab.etcum > 0],missing='drop').fit()
     dmod = smf.ols("etnorm ~ 0 + etcum + C(ddi)",data=btab,missing='drop').fit()
+
     #dmod2 = smf.ols("et2 ~ 0 + etcum:F + C(ddi):F",data=btab,missing='drop').fit()
 
     dfull["tau_ddreg"] = -2/dmod.params.iloc[-1]
@@ -426,7 +442,17 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dmod2 = smf.ols("et2 ~ 0 + etcum:F + C(ddi):F",data=btab,missing='drop').fit()
     dfull["tau_ddreg_et2"] = -2/dmod2.params.iloc[0]
     dfull["tauET2_rel_err"] = -dmod2.bse[0]/dmod2.params[0]
+#%%
+    srec = dmod.predict(btab)/-dmod.params.iloc[-1]
+    dfull["cor_retrieved_smc"] = cor_skipna(srec,btab.smc)[0]
+    dfull["cor_retrieved_smc_pval"] = cor_skipna(srec,btab.smc)[1]
+    btab["srec"] = srec
+    #bmean = btab.groupby("ddi").mean(numeric_only=True)
+    
+    bfirst = btab.groupby("ddi").first()
 
+    dfull["cor_retrieved_smc0"] = cor_skipna(bfirst.srec,bfirst.smc)[0]
+    dfull["cor_retrieved_smc0_pval"] = cor_skipna(bfirst.srec,bfirst.smc)[1]
 #%%   
     ddlist.append(btab)
     
@@ -446,7 +472,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["etr2_norm"] = r2_skipna(epredN/tab2.et_init,tab2.ET/tab2.et_init)
     dfull["gr2_norm"] = r2_skipna(epredN/tab2.VPD/tab2.g_init,tab2.cond/tab2.g_init)
     
-    
+    dfull["etr2_raw"] = r2_skipna(epredN,tab2.ET)
+    dfull["gr2_raw"] = r2_skipna(epredN/tab2.VPD,tab2.cond)
     #%%
     all_results.append(dfull)
     
@@ -686,8 +713,8 @@ myplot(axes[0,1],df_meta.fullyear_dmax,df_meta.tau,
        "Annual $D_{max}$ (days)","")
 myplot(axes[0,2],df_meta.ddrain_2mean,df_meta.tau,
        "GrowSeas $D_{mean}$ (days)","")
-axes[0,2].plot([0,np.max(df_meta.ddrain_2mean)],[0,np.max(df_meta.ddrain_2mean)],'k--')
-
+axes[0,2].plot([0,np.max(df_meta.ddrain_2mean)],[0,np.max(df_meta.ddrain_2mean)],'k--',label="1:1 line")
+axes[0,2].legend(loc="lower right",fontsize=14)
 
 fig.tight_layout()
 
@@ -775,6 +802,32 @@ def fit_smc(tab2):
     smc0 = -dmod.predict(tab2)/dmod.params.iloc[-1] + tab2.etcum
     return smc0 - tab2.etcum, -2/dmod.params.iloc[-1]
 
+def fit_smc2(tab2):
+    dmod = smf.ols("etnorm ~ 0 + etcum + C(ddi)",data=tab2,missing='drop').fit()
+    bdd = dmod.predict(tab2) - tab2.etcum*dmod.params.iloc[-1]
+    return tab2.etnorm - bdd, -2/dmod.params.iloc[-1]
+
+
+# def fit_smc2(tab2):
+#     dmod = smf.ols("etnorm ~ 0 + etcum + np.power(etcum,2) + C(ddi)",data=tab2,missing='drop').fit()
+#     bdd = dmod.predict(tab2) - tab2.etcum*dmod.params.iloc[-2] - tab2.etcum**2*dmod.params.iloc[-1]
+#     return tab2.etnorm - bdd, -2/dmod.params.iloc[-1]
+
+# def fit_smc2(tab2):
+#     dmod = smf.ols("et2 ~ 0 + etcum:F + C(ddi):F",data=tab2,missing='drop').fit()
+#     bdd = dmod.predict(tab2) - tab2.etcum*tab2.F*dmod.params.iloc[0]
+#     return tab2.etnorm - bdd, -2/dmod.params.iloc[-1]
+
+
+
+def fit_smc0(tab2):
+    tab1f = tab2.groupby("ddi").first().reset_index()
+    tab1f["etn0"] = 1*tab1f["etnorm"]
+    tab1 = pd.merge(tab2,tab1f[["ddi",'etn0']],on="ddi",how="left")
+    tab1["et_mb"] = tab1.etnorm-tab1.etn0
+    imod = smf.ols("et_mb ~ etcum",missing='drop',data=tab1).fit()
+    return tab1, imod
+
 #%%
 plt.figure(figsize=(10,8))
 plt.axvline(0,color="grey",linestyle="--")
@@ -798,27 +851,53 @@ plt.ylabel(r"$ET_{norm}-\overline{ET_{norm}}$ (mm/day)")
 plt.legend(loc="lower left")
 #%%
 plt.figure(figsize=(10,8))
-#plt.axvline(0,color="grey",linestyle="--")
-#plt.axhline(0,color="grey",linestyle="--")
 
-tab1 =  ddlist.loc[ddlist.SITE_ID=="US-Me5"].copy()
-tab2 =  ddlist.loc[ddlist.SITE_ID=="US-SRM"].copy()
-#tab2 =  ddlist.loc[ddlist.SITE_ID=="US-ARc"].copy()
 t1s,t1tau = fit_smc(tab1)
 t2s,t2tau = fit_smc(tab2)
 
 plt.plot(t1s,tab1.etnorm,'o',label=r"US-Me5, $\tau$ = 40 days",alpha=0.6)
 plt.plot(t2s,tab2.etnorm,'o',label=r"US-SRM, $\tau$ = 16 days",alpha=0.6)
-#rA = sm.OLS(tab1.et_per_F_dm,tab1.row0,missing='drop').fit()
-#rB = sm.OLS(tab2.et_per_F_dm,tab2.row0,missing='drop').fit()
 xarr = np.array([0,110])
 plt.plot(xarr,xarr*2/t1tau,color="blue")
-xarr = np.array([0,110])
+xarr = np.array([0,60])
 plt.plot(xarr,xarr*2/t2tau,color="red")
 
 plt.xlabel("$s-s_w$ (mm)")
 plt.ylabel("$ET_{norm}$ (mm/day)")
-plt.legend(loc="upper left")
+plt.legend()
+#%%
+
+tab1 =  ddlist.loc[ddlist.SITE_ID=="US-Me5"].copy().dropna()
+#tab1 = tab1.loc[tab1.etcum > 0].copy()
+tab2 = tab1.copy()
+t1ei,t1tau = fit_smc2(tab1)
+
+plt.figure(figsize=(10,8))
+
+plt.plot(tab1.etcum,t1ei,'o',label=r"US-Me5, $\tau$ = 40 days",alpha=0.6)
+#plt.plot(tab2.etcum,t2ei,'o',label=r"US-SRM, $\tau$ = 16 days",alpha=0.6)
+xarr = np.array([0,np.max(tab1.etcum)])
+plt.plot(xarr,xarr*-2/t1tau,color="blue")
+
+plt.xlabel("$ET_{acc}$ (mm)")
+plt.ylabel("$ET_{norm} - b_{dd}$ (mm/day)")
+plt.legend()
+#%%
+# plt.figure(figsize=(10,8))
+
+# t1s,t1m = fit_smc0(tab1)
+# t2s,t2m = fit_smc0(tab2)
+
+# plt.plot(t1s.etcum,t1s.et_mb,'o',label=r"US-Me5, $\tau$ = 40 days",alpha=0.6)
+# plt.plot(t2s.etcum,t2s.et_mb,'o',label=r"US-SRM, $\tau$ = 16 days",alpha=0.6)
+# # xarr = np.array([0,110])
+# # plt.plot(xarr,xarr*2/t1tau,color="blue")
+# # xarr = np.array([0,60])
+# # plt.plot(xarr,xarr*2/t2tau,color="red")
+
+# plt.xlabel("$ET_{acc}$ (mm)")
+# plt.ylabel("$ET_{norm}$ (mm/day)")
+# plt.legend()
 
 #%%
 from statsmodels.stats.anova import anova_lm
@@ -851,7 +930,7 @@ plt.ylabel("Drydown mean soil moisture")
 plt.xlabel("Site")
 plt.xticks(range(len(site_10)), site_10, rotation=90);  
 #%%
-site_year2 = all_results.groupby("SITE_ID").nunique().reset_index()
+site_year2 = ddlist.groupby("SITE_ID").nunique().reset_index()
 site_year2["N_year"] = site_year2.year
 df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
 'LOCATION_LAT','LOCATION_LONG','LOCATION_ELEV',
@@ -863,8 +942,49 @@ df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
 'tau_ddreg','tau_ddreg_lo','tau_ddreg_hi',
 'etr2_norm','gr2_norm']].copy()
 df_export = pd.merge(df_export,site_year2[["SITE_ID","N_year"]],on="SITE_ID",how="left")
+newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2	N_years_of_data".split()
+#%%
+df_export.columns = newcolnames
+#%%
+
 #df_export["ddlen_mean"] = df_export.reg_ndd/df_export.reg_npoints
 #%%
+xt = df_meta.tau
+print("Tau, lower upper mean: ")
+print(np.min(xt),np.max(xt),np.mean(xt))
+xt = df_meta.tau_ddreg_hi - df_meta.tau_ddreg_lo
+print("Tau 95% CI, lower upper mean: ")
+print(np.min(xt),np.max(xt),np.mean(xt))
+xt = df_meta.reg_ndd
+print("N dd, lower upper mean: ")
+print(np.min(xt),np.max(xt),np.mean(xt))
+xt = df_export.N_years_of_data
+print("N year, lower upper mean: ")
+print(np.min(xt),np.max(xt),np.mean(xt))
+
+xt = df_meta.gppR2_exp
+print("GPP R2, lower upper mean: ")
+print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt))
+
+
+xt = df_meta.etr2_norm
+print("ET R2, lower upper mean positive: ")
+print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt), np.sum(xt>0))
+
+xt = df_meta.gr2_norm
+print("g R2, lower upper mean: ")
+print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt) , np.sum(xt>0))
+#%%
+xt = df_meta.mat_data
+print("Annual temp, lower upper: ")
+print(np.min(xt),np.max(xt))
+
+xt = df_meta.map_data*365/10
+print("Annual precip, lower upper: ")
+print(np.min(xt),np.max(xt))
+#%%
+site_meanLAI = all_results.groupby("SITE_ID").mean(numeric_only=True).reset_index()[["SITE_ID","LAI"]]
+df_meta2 = pd.merge(df_meta,site_meanLAI,on='SITE_ID',how="left")
 # ddlist2 = ddlist.loc[ddlist.SITE_ID.isin(df_meta.SITE_ID)].copy()
 # ddlist2["site_dd"] = ddlist2.SITE_ID + ddlist2.ddi.astype(str)
 # #%%
