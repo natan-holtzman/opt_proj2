@@ -107,7 +107,7 @@ med_g[med_g < 0] = 0
 ax = axes[0,1]
 ax.plot(s_sw_range*zsoil_mm,new_opt_g,"r",label="Time-integrated",linewidth=3); 
 ax.plot(s_sw_range*zsoil_mm,med_g,"k--",label=r"Medlyn",linewidth=3)
-ax.set_xlabel("s - $s_w$ (mm)")
+ax.set_xlabel("w - $w_c$ (mm)")
 ax.set_ylabel("g $(mol/m^2/s)$")
 ax.set_title("(b)",loc="left")
 
@@ -141,7 +141,7 @@ allmax = np.round(max(np.max(new_opt_g),np.max(med_g)),1)
 ax = axes[1,0]
 pcm = ax.pcolormesh(vpd_range,s_sw_range*zsoil_mm,new_opt_g,vmin=0,vmax=allmax)
 ax.set_xlabel("VPD (kPa)")
-ax.set_ylabel("s - $s_w$ (mm)")
+ax.set_ylabel("w - $w_c$ (mm)")
 #ax.set_title("$g_{INT}$ $(mol/m^2/s)$")
 ax.set_title("(c)",loc="left")
 
@@ -151,7 +151,7 @@ fig.colorbar(pcm, ax=ax,label="$g_{INT}$ $(mol/m^2/s)$")
 ax = axes[1,1]
 pcm = ax.pcolormesh(vpd_range,s_sw_range*zsoil_mm,med_g,vmin=0,vmax=allmax)
 ax.set_xlabel("VPD (kPa)")
-ax.set_ylabel("s - $s_w$ (mm)")
+ax.set_ylabel("w - $w_c$ (mm)")
 ax.set_title("(d)",loc="left")
 
 fig.colorbar(pcm, ax=ax,label="$g_{MED}$ $(mol/m^2/s)$")
@@ -163,7 +163,7 @@ absmax = np.max(np.abs(gdiff))
 ax = axes[2,0]
 pcm = ax.pcolormesh(vpd_range,s_sw_range*zsoil_mm,gdiff,cmap="RdBu",vmin=-absmax,vmax= absmax)
 ax.set_xlabel("VPD (kPa)")
-ax.set_ylabel("s - $s_w$ (mm)")
+ax.set_ylabel("w - $w_c$ (mm)")
 #ax.set_title("$g_{INT}-g_{MED}$ $(mol/m^2/s)$")
 ax.set_title("(e)",loc="left")
 
@@ -197,5 +197,51 @@ plt.figure()
 plt.plot(s_sw_range*zsoil_mm,WUE,linewidth=3)
 plt.xlim(0,300)
 plt.ylim(30,90)
-plt.xlabel("s - $s_w$ (mm)")
+plt.xlabel("w - $w_c$ (mm)")
 plt.ylabel("iWUE ($\mu$mol $CO_2$/mol $H_2 O$)")
+#%%
+g_range = np.linspace(-0.2,2,600)
+vmax = 15
+gA_range = np.linspace(0.05,0.25,100)
+#a_exp = vmax*(1-np.exp(-g_range/vmax*slope_at_0))
+#%%
+vpd_val = 1.5
+tau_day = 30
+tau_s = tau_day*(60*60*24)
+zsoil_mol = 1000*1000/18
+zsoil_mm = 1000
+s_above_wilt = 0.2
+new_opt_g = np.sqrt(2/tau_s*gA_range*zsoil_mol*s_above_wilt/(vpd_val/100))
+#%%
+g1 = 5.33
+quot_pred = 1.6/400*(1+g1/np.sqrt(vpd_val))
+med_g = np.zeros(len(gA_range))
+for i in range(len(med_g)):
+    a_exp = vmax*(1-np.exp(-g_range/gA_range[i]))
+    med_g[i] = np.interp(quot_pred,g_range/a_exp,g_range)
+#med_g = np.interp(quot_pred,g_range/a_exp,g_range)
+med_g[med_g < 0] = 0
+#%%
+optA = vmax*(1-np.exp(-new_opt_g/gA_range))
+medA = vmax*(1-np.exp(-med_g/gA_range))
+#%%
+gA_rand = np.random.rand(500)*0.2+ 0.05
+vpd_rand = np.random.rand(500)*2.5 + 0.5
+s_rand = np.random.rand(500)*0.4 + 0.05
+
+new_opt_g = np.sqrt(2/tau_s*gA_rand*zsoil_mol*s_rand/(vpd_rand/100))
+med_g = np.zeros(len(gA_rand))
+for i in range(len(med_g)):
+    beta_value = myopt.x[2]*(s_rand[i]+myopt.x[1])**myopt.x[0]
+    quot_pred = 1.6/400*(1+g1*beta_value/np.sqrt(vpd_rand[i]))
+    a_exp = vmax*(1-np.exp(-g_range/gA_rand[i]))
+    med_g[i] = np.interp(quot_pred,g_range/a_exp,g_range)
+#med_g = np.interp(quot_pred,g_range/a_exp,g_range)
+med_g[med_g < 0] = 0
+#%%
+optA = vmax*(1-np.exp(-new_opt_g/gA_rand))
+medA = vmax*(1-np.exp(-med_g/gA_rand))
+#%%
+plt.figure()
+plt.plot(optA/np.sqrt(vpd_rand),new_opt_g,'.'); 
+plt.plot(medA/np.sqrt(vpd_rand),med_g,'.')

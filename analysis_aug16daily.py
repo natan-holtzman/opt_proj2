@@ -244,6 +244,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
     et_avg = []
     et_init = []
     is_limited = []
+    dd_doy = []
     
     individual_slopes = []
     
@@ -341,6 +342,9 @@ for site_id in pd.unique(bigyear.SITE_ID):
                     individual_slopes.append([rDD.params[1]]*len(yfull))
                     ddlabel.append([ddii]*len(yfull))
                     ddyears.append([y0]*len(yfull))
+                    dd_doy.append(dfy.doy.iloc[starti:endi])
+
+                    
                     frec.append(f_of_t)
                     grec.append(g_of_t)
                     vpd_plain.append(vpd_arr[starti:endi])
@@ -410,10 +414,14 @@ for site_id in pd.unique(bigyear.SITE_ID):
                          "VPD":np.concatenate(vpd_plain),
                          "etcum":np.concatenate(etcum),
                          "smc":np.concatenate(smclist),
+                         "doy":np.concatenate(dd_doy),
 
                          "year":np.concatenate(ddyears),
                          "ddslopes":np.concatenate(individual_slopes),
-                         "ddlen":np.concatenate([[len(x)]*len(x) for x in vpd_plain])})
+                         "ddlen":np.concatenate([[len(x)]*len(x) for x in vpd_plain]),
+                         "day_of_dd":np.concatenate([np.arange(len(x)) for x in vpd_plain])})
+
+
     #%%
     btab["cond"] = btab.ET/btab.VPD
     tau = -2/r1.params[0]
@@ -442,6 +450,16 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dmod2 = smf.ols("et2 ~ 0 + etcum:F + C(ddi):F",data=btab,missing='drop').fit()
     dfull["tau_ddreg_et2"] = -2/dmod2.params.iloc[0]
     dfull["tauET2_rel_err"] = -dmod2.bse[0]/dmod2.params[0]
+    #%%
+    #dmod_sq = smf.ols("etnorm ~ 0 + etcum + np.power(etcum,2) + C(ddi)",data=btab,missing='drop').fit()
+    #dmod_day = smf.ols("etnorm ~ 0 + etcum + etcum:day_of_dd + C(ddi)",data=btab,missing='drop').fit()
+    #dmod_len = smf.ols("etnorm ~ 0 + etcum + ddlen + etcum:ddlen + C(ddi)",data=btab,missing='drop').fit()
+    #dmod_doy = smf.ols("etnorm ~ 0 + etcum*doy + C(ddi)",data=btab,missing='drop').fit()
+    #dmod_doy_dday = smf.ols("etnorm ~ 0 + etcum*doy + etcum:day_of_dd + C(ddi)",data=btab,missing='drop').fit()
+#%%
+    #dmod_day = smf.ols("etnorm ~ 0 + etcum + etcum:day_of_dd + day_of_dd*C(ddi)",data=btab,missing='drop').fit()
+#    dmod_day = smf.ols("etnorm ~ 0 + etcum_per_day  + day_o1:C(ddi)",data=btab,missing='drop').fit()
+
 #%%
     srec = dmod.predict(btab)/-dmod.params.iloc[-1]
     dfull["cor_retrieved_smc"] = cor_skipna(srec,btab.smc)[0]
@@ -453,6 +471,12 @@ for site_id in pd.unique(bigyear.SITE_ID):
 
     dfull["cor_retrieved_smc0"] = cor_skipna(bfirst.srec,bfirst.smc)[0]
     dfull["cor_retrieved_smc0_pval"] = cor_skipna(bfirst.srec,bfirst.smc)[1]
+    #%%
+    
+    bfirst = btab.groupby("ddi").mean(numeric_only=True)
+
+    dfull["cor_retrieved_smc0_ddmean"] = cor_skipna(bfirst.srec,bfirst.smc)[0]
+    dfull["cor_retrieved_smc0_pval_ddmean"] = cor_skipna(bfirst.srec,bfirst.smc)[1]
 #%%   
     ddlist.append(btab)
     
@@ -623,8 +647,8 @@ fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),n
 df_meta3 = df_meta.sort_values("etr2_norm")
 df_meta3["et_rank"] = np.arange(len(df_meta3))
 
-fig,axes = plt.subplots(3,1,figsize=(16,10))
-ax = axes[1]
+fig,axes = plt.subplots(4,1,figsize=(12,12))
+ax = axes[2]
 
 points_handles = []
 for i in range(len(biome_list)):
@@ -642,7 +666,7 @@ ax.set_title(r"$R^2$ of $ET/ET_{0}$ during water-limited drydowns",fontsize=24)
 
 df_meta3 = df_meta.sort_values("gr2_norm")
 df_meta3["g_rank"] = np.arange(len(df_meta3))
-ax = axes[2]
+ax = axes[3]
 points_handles = []
 for i in range(len(biome_list)):
     subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
@@ -655,6 +679,24 @@ ax.set_ylim(0,1)
 ax.set_xticks(df_meta3.g_rank,df_meta3.SITE_ID,rotation=90)
 ax.set_title(r"$R^2$ of $g/g_{0}$ during water-limited drydowns",fontsize=24)
 #ax.axhline(0,color='k')
+
+#df_meta["r2_retrieved_smc"] = df_meta["cor_retrieved_smc"]**2
+df_meta3 = df_meta.sort_values("cor_retrieved_smc")
+df_meta3["s_rank"] = np.arange(len(df_meta3))
+ax = axes[1]
+points_handles = []
+for i in range(len(biome_list)):
+    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
+    if len(subI) > 0:
+        pointI, = ax.plot(subI.s_rank,subI.cor_retrieved_smc,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
+        points_handles.append(pointI)
+
+#ax.set_xlim(0,250)
+ax.set_ylim(0,1)
+ax.set_xticks(df_meta3.s_rank,df_meta3.SITE_ID,rotation=90)
+ax.set_title(r"Corr. of modeled and observed soil moisture during water-limited drydowns",fontsize=24)
+#ax.axhline(0,color='k')
+
 
 
 df_meta3 = df_meta.sort_values("gppR2_exp")
@@ -940,9 +982,9 @@ df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
 'fullyear_dmax','fullyear_dmean','seas_rain_max0','seas_rain_mean0',
 'gppR2_exp','reg_ndd','reg_npoints',
 'tau_ddreg','tau_ddreg_lo','tau_ddreg_hi',
-'etr2_norm','gr2_norm']].copy()
+'etr2_norm','gr2_norm',"cor_retrieved_smc"]].copy()
 df_export = pd.merge(df_export,site_year2[["SITE_ID","N_year"]],on="SITE_ID",how="left")
-newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2	N_years_of_data".split()
+newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2   soil_mois_model_cor 	N_years_of_data".split()
 #%%
 df_export.columns = newcolnames
 #%%
@@ -1007,3 +1049,29 @@ df_meta2 = pd.merge(df_meta,site_meanLAI,on='SITE_ID',how="left")
 # taulenmod = smf.ols("et_per_F_dm ~ C(SITE_ID):row0 + ddlen*row0",data=ddlist2,missing="drop").fit()
 # #%%
 # dlen_diff = anova_lm(taulenmod)
+#%%
+plt.figure(figsize=(9,9)); 
+plt.plot(df_meta.tau_ddreg_hi - df_meta.tau_ddreg_lo, df_meta.tau_ddreg0_hi - df_meta.tau_ddreg0_lo,'o'); 
+plt.plot([0,100],[0,100],label="1:1 line");
+plt.xlabel("CI width without centering (days)")
+plt.ylabel("CI width with centering (days)")
+plt.legend()
+plt.xlim(0,100)
+plt.ylim(0,100)
+#%%
+
+#%%
+fig, ax = plt.subplots(2,2,figsize=(10,8))
+ax[0,0].plot(df_meta.reg_ndd, df_meta.tau_rel_err,'o'); 
+ax[0,0].set_xlabel("Number of drydowns analyzed")
+
+ax[0,1].plot(df_meta.reg_npoints, df_meta.tau_rel_err,'o'); 
+ax[0,1].set_xlabel("Number of days analyzed")
+
+ax[1,0].plot(df_meta.gppR2_exp, df_meta.tau_rel_err,'o'); 
+ax[1,0].set_xlabel("$R^2$ of GPP model")
+
+ax[1,1].set_axis_off()
+
+fig.supylabel("Relative standard error of regression slope")
+fig.tight_layout()

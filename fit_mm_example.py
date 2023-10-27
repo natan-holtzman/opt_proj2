@@ -19,7 +19,7 @@ import matplotlib as mpl
 bif_data = pd.read_csv("../optimality_proj/fn2015_bif_tab.csv")
 #bif_forest = bif_data.loc[bif_data.IGBP.isin(["MF","ENF","EBF","DBF","DNF"])]
 bif_forest = bif_data.loc[bif_data.IGBP.isin(["MF","ENF","EBF","DBF","DNF","GRA","SAV","WSA","OSH","CSH"])]
-metadata = pd.read_csv(r"C:\Users\nholtzma\Downloads\fluxnet_site_info_all.csv")
+#metadata = pd.read_csv(r"C:\Users\nholtzma\Downloads\fluxnet_site_info_all.csv")
 
 all_daily = glob.glob(r"C:\Users\nholtzma\Downloads\fluxnet2015\daily_data\*.csv")
 forest_daily = [x for x in all_daily if x.split("\\")[-1].split('_')[1] in list(bif_forest.SITE_ID)]
@@ -469,3 +469,16 @@ plt.ylim(0,50)
 plt.xlabel("Hourly canopy conductance $(mol/m^2/s)$")
 plt.ylabel("Hourly GPP $(\mu mol/m^2/s)$")
 plt.legend()
+#%%
+xarr = np.linspace(0,1.5,200)
+A1 = 30*(1-np.exp(-xarr/0.15))
+A2 = 30*(1-np.exp(-xarr/0.3))
+plt.figure(figsize=(8,6))
+plt.plot(xarr,A1,'r',linewidth=3)
+plt.plot(xarr,A2,'g',linewidth=3)
+plt.plot(xarr,xarr*0+30,'k--')
+plt.ylim(0,33)
+plt.xlim(0,1.5)
+plt.xlabel("g $(mol/m^2/s)$",fontsize=24)
+plt.ylabel("A $(\mu mol/m^2/s)$",fontsize=24)
+   
