@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import scipy.optimize
-#import glob
 import statsmodels.formula.api as smf
 
 import matplotlib as mpl
@@ -456,16 +455,6 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["tau_ddreg2_hi"] = -2/(dmod.params.iloc[-1]+2*dmod.bse.iloc[-1])
     dfull["tau_ddreg2_lo"] = -2/(dmod.params.iloc[-1]-2*dmod.bse.iloc[-1])
     dfull["tauET2_rel_err"] = -dmod2.bse[0]/dmod2.params[0]
-    #%%
-    #dmod_sq = smf.ols("etnorm ~ 0 + etcum + np.power(etcum,2) + C(ddi)",data=btab,missing='drop').fit()
-    #dmod_day = smf.ols("etnorm ~ 0 + etcum + etcum:day_of_dd + C(ddi)",data=btab,missing='drop').fit()
-    #dmod_len = smf.ols("etnorm ~ 0 + etcum + ddlen + etcum:ddlen + C(ddi)",data=btab,missing='drop').fit()
-    #dmod_doy = smf.ols("etnorm ~ 0 + etcum*doy + C(ddi)",data=btab,missing='drop').fit()
-    #dmod_doy_dday = smf.ols("etnorm ~ 0 + etcum*doy + etcum:day_of_dd + C(ddi)",data=btab,missing='drop').fit()
-#%%
-    #dmod_day = smf.ols("etnorm ~ 0 + etcum + etcum:day_of_dd + day_of_dd*C(ddi)",data=btab,missing='drop').fit()
-#    dmod_day = smf.ols("etnorm ~ 0 + etcum_per_day  + day_o1:C(ddi)",data=btab,missing='drop').fit()
-
 #%%
     srec = dmod.predict(btab)/-dmod.params.iloc[-1]
     dfull["cor_retrieved_smc"] = cor_skipna(srec,btab.smc)[0]
@@ -626,8 +615,6 @@ ax.plot(df_meta.LOCATION_LONG,df_meta.LOCATION_LAT,'*',alpha=0.75,color="red",ma
 ax.set_xlim(np.min(df_meta.LOCATION_LONG)-7,np.max(df_meta.LOCATION_LONG)+7)
 ax.set_ylim(np.min(df_meta.LOCATION_LAT)-7,np.max(df_meta.LOCATION_LAT)+7)
 #%%
-#df_meta = pd.merge(df_meta,df_base[["SITE_ID","Aridity","Aridity_gs","mat_data","map_data"]],on="SITE_ID",how="left")
-
 
 #%%
 fig,ax = plt.subplots(1,1,figsize=(10,8))
@@ -645,82 +632,6 @@ ax.set_xlabel("Average temperature ($^oC)$",fontsize=24)
 ax.set_ylabel("Average annual precip. (cm)",fontsize=24)
 
 fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=3 )
-#ax.vlines(df_meta.ddrain_mean,df_meta.tau_75,df_meta.tau_25,color="k")
-#%%
-
-
-#%%
-df_meta3 = df_meta.sort_values("etr2_norm")
-df_meta3["et_rank"] = np.arange(len(df_meta3))
-
-fig,axes = plt.subplots(4,1,figsize=(12,12))
-ax = axes[2]
-
-points_handles = []
-for i in range(len(biome_list)):
-    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
-    if len(subI) > 0:
-        pointI, = ax.plot(subI.et_rank,subI.etr2_norm,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
-        points_handles.append(pointI)
-ax.set_xticks(df_meta3.et_rank,df_meta3.SITE_ID,rotation=90)
-#ax.set_xlim(0,250)
-ax.set_ylim(0,1)
-#ax.set_xlabel("Rank",fontsize=24)
-ax.set_title(r"$R^2$ of $ET/ET_{0}$ during water-limited drydowns",fontsize=24)
-
-#ax.vlines(df_meta.ddrain_mean,df_meta.tau_75,df_meta.tau_25,color="k")
-
-df_meta3 = df_meta.sort_values("gr2_norm")
-df_meta3["g_rank"] = np.arange(len(df_meta3))
-ax = axes[3]
-points_handles = []
-for i in range(len(biome_list)):
-    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
-    if len(subI) > 0:
-        pointI, = ax.plot(subI.g_rank,subI.gr2_norm,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
-        points_handles.append(pointI)
-
-#ax.set_xlim(0,250)
-ax.set_ylim(0,1)
-ax.set_xticks(df_meta3.g_rank,df_meta3.SITE_ID,rotation=90)
-ax.set_title(r"$R^2$ of $g/g_{0}$ during water-limited drydowns",fontsize=24)
-#ax.axhline(0,color='k')
-
-#df_meta["r2_retrieved_smc"] = df_meta["cor_retrieved_smc"]**2
-df_meta3 = df_meta.sort_values("cor_retrieved_smc")
-df_meta3["s_rank"] = np.arange(len(df_meta3))
-ax = axes[1]
-points_handles = []
-for i in range(len(biome_list)):
-    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
-    if len(subI) > 0:
-        pointI, = ax.plot(subI.s_rank,subI.cor_retrieved_smc,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
-        points_handles.append(pointI)
-
-#ax.set_xlim(0,250)
-ax.set_ylim(0,1)
-ax.set_xticks(df_meta3.s_rank,df_meta3.SITE_ID,rotation=90)
-ax.set_title(r"Corr. of modeled and observed soil moisture during water-limited drydowns",fontsize=24)
-#ax.axhline(0,color='k')
-
-
-
-df_meta3 = df_meta.sort_values("gppR2_exp")
-df_meta3["gpp_rank"] = np.arange(len(df_meta3))
-ax = axes[0]
-points_handles = []
-for i in range(len(biome_list)):
-    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
-    if len(subI) > 0:
-        pointI, = ax.plot(subI.gpp_rank,subI.gppR2_exp,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
-        points_handles.append(pointI)
-
-#ax.set_xlim(0,250)
-ax.set_ylim(0,1)
-ax.set_xticks(df_meta3.gpp_rank,df_meta3.SITE_ID,rotation=90)
-ax.set_title(r"$R^2$ of GPP given observed g during growing season",fontsize=24)
-fig.tight_layout()
-fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.02),ncols=3)
 #ax.vlines(df_meta.ddrain_mean,df_meta.tau_75,df_meta.tau_25,color="k")
 #%%
 df_meta3 = df_meta.sort_values("etr2_norm")
@@ -822,30 +733,6 @@ fig.tight_layout()
 
 fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=3 )
 #%%
-# def myplot2(ax,x0,y0,xlab,ylab):
-#     inliers = (x0 < np.sort(x0)[-2])*(y0 < np.sort(y0)[-2])
-#     x = x0[inliers]
-#     y = y0[inliers]
-
-#     ax.scatter(x,y,c=plot_colors[inliers])
-#     ax.set_xlabel(xlab)
-#     ax.set_ylabel(ylab)
-#     ax.set_ylim(0,70)
-#     myr2 = np.corrcoef(x,y)[0,1]**2
-#     ax.text(0.1,0.85,  "$R^2$ = " + str(np.round(myr2,2)),transform=ax.transAxes)
-
-#%%
-# def out_bounds(x0):
-#     x = np.log(x0)
-#     q1 = np.quantile(x,0.25)
-#     q3 = np.quantile(x,0.75)
-
-#     iqr = q3-q1
-#     return np.exp(q1-1.5*iqr),np.exp(q3+1.5*iqr)
-# def in_bounds(x):
-#     bX = out_bounds(x)
-#     return (x > bX[0])*(x < bX[1])
-# #%%
 def in_bounds(x):
     return (x < np.sort(x)[-2]) #*(x > np.sort(x)[1])
 inliers = np.ones(len(df_meta))
@@ -972,140 +859,10 @@ plt.ylabel("ET (mm/day)",fontsize=22)
 plt.text(1.5,1.25,site_pair[0],fontsize=20)
 plt.text(1.5,2.7,site_pair[1],fontsize=20)
 plt.ylim(-0.1,3)
-
-#%%
-def fit_smc(tab2):
-    dmod = smf.ols("etnorm ~ 0 + etcum + C(ddi)",data=tab2,missing='drop').fit()
-    smc0 = -dmod.predict(tab2)/dmod.params.iloc[-1] + tab2.etcum
-    return smc0 - tab2.etcum, -2/dmod.params.iloc[-1]
-
-def fit_smc2(tab2):
-    dmod = smf.ols("etnorm ~ 0 + etcum + C(ddi)",data=tab2,missing='drop').fit()
-    bdd = dmod.predict(tab2) - tab2.etcum*dmod.params.iloc[-1]
-    return tab2.etnorm - bdd, -2/dmod.params.iloc[-1]
-
-
-# def fit_smc2(tab2):
-#     dmod = smf.ols("etnorm ~ 0 + etcum + np.power(etcum,2) + C(ddi)",data=tab2,missing='drop').fit()
-#     bdd = dmod.predict(tab2) - tab2.etcum*dmod.params.iloc[-2] - tab2.etcum**2*dmod.params.iloc[-1]
-#     return tab2.etnorm - bdd, -2/dmod.params.iloc[-1]
-
-# def fit_smc2(tab2):
-#     dmod = smf.ols("et2 ~ 0 + etcum:F + C(ddi):F",data=tab2,missing='drop').fit()
-#     bdd = dmod.predict(tab2) - tab2.etcum*tab2.F*dmod.params.iloc[0]
-#     return tab2.etnorm - bdd, -2/dmod.params.iloc[-1]
-
-
-
-def fit_smc0(tab2):
-    tab1f = tab2.groupby("ddi").first().reset_index()
-    tab1f["etn0"] = 1*tab1f["etnorm"]
-    tab1 = pd.merge(tab2,tab1f[["ddi",'etn0']],on="ddi",how="left")
-    tab1["et_mb"] = tab1.etnorm-tab1.etn0
-    imod = smf.ols("et_mb ~ etcum",missing='drop',data=tab1).fit()
-    return tab1, imod
-
-#%%
-plt.figure(figsize=(10,8))
-plt.axvline(0,color="grey",linestyle="--")
-plt.axhline(0,color="grey",linestyle="--")
-
-tab1 =  ddlist.loc[ddlist.SITE_ID=="US-Me5"].copy()
-tab2 =  ddlist.loc[ddlist.SITE_ID=="US-SRM"].copy()
-#tab2 =  ddlist.loc[ddlist.SITE_ID=="US-ARc"].copy()
-
-plt.plot(tab1.row0,tab1.et_per_F_dm,'o',label=r"US-Me5, $\tau$ = 46 days",alpha=0.6)
-plt.plot(tab2.row0,tab2.et_per_F_dm,'o',label=r"US-SRM, $\tau$ = 15 days",alpha=0.6)
-rA = sm.OLS(tab1.et_per_F_dm,tab1.row0,missing='drop').fit()
-rB = sm.OLS(tab2.et_per_F_dm,tab2.row0,missing='drop').fit()
-xarr = np.array([-25,25])
-plt.plot(xarr,xarr*rA.params[0],color="tab:blue")
-xarr = np.array([-15,15])
-plt.plot(xarr,xarr*rB.params[0],color="tab:orange")
-
-plt.xlabel(r"$ET_{acc}-\overline{ET_{acc}}$ (mm)")
-plt.ylabel(r"$ET_{norm}-\overline{ET_{norm}}$ (mm/day)")
-plt.legend(loc="lower left")
-#%%
-plt.figure(figsize=(10,8))
-
-t1s,t1tau = fit_smc(tab1)
-t2s,t2tau = fit_smc(tab2)
-
-plt.plot(t1s,tab1.etnorm,'o',label=r"US-Me5, $\tau$ = 40 days",alpha=0.6)
-plt.plot(t2s,tab2.etnorm,'o',label=r"US-SRM, $\tau$ = 16 days",alpha=0.6)
-xarr = np.array([0,110])
-plt.plot(xarr,xarr*2/t1tau,color="blue")
-xarr = np.array([0,60])
-plt.plot(xarr,xarr*2/t2tau,color="red")
-
-plt.xlabel("$s-s_w$ (mm)")
-plt.ylabel("$ET_{norm}$ (mm/day)")
-plt.legend()
-#%%
-
-tab1 =  ddlist.loc[ddlist.SITE_ID=="US-Me5"].copy().dropna()
-#tab1 = tab1.loc[tab1.etcum > 0].copy()
-tab2 = tab1.copy()
-t1ei,t1tau = fit_smc2(tab1)
-
-plt.figure(figsize=(10,8))
-
-plt.plot(tab1.etcum,t1ei,'o',label=r"US-Me5, $\tau$ = 40 days",alpha=0.6)
-#plt.plot(tab2.etcum,t2ei,'o',label=r"US-SRM, $\tau$ = 16 days",alpha=0.6)
-xarr = np.array([0,np.max(tab1.etcum)])
-plt.plot(xarr,xarr*-2/t1tau,color="blue")
-
-plt.xlabel("$ET_{acc}$ (mm)")
-plt.ylabel("$ET_{norm} - b_{dd}$ (mm/day)")
-plt.legend()
-#%%
-# plt.figure(figsize=(10,8))
-
-# t1s,t1m = fit_smc0(tab1)
-# t2s,t2m = fit_smc0(tab2)
-
-# plt.plot(t1s.etcum,t1s.et_mb,'o',label=r"US-Me5, $\tau$ = 40 days",alpha=0.6)
-# plt.plot(t2s.etcum,t2s.et_mb,'o',label=r"US-SRM, $\tau$ = 16 days",alpha=0.6)
-# # xarr = np.array([0,110])
-# # plt.plot(xarr,xarr*2/t1tau,color="blue")
-# # xarr = np.array([0,60])
-# # plt.plot(xarr,xarr*2/t2tau,color="red")
-
-# plt.xlabel("$ET_{acc}$ (mm)")
-# plt.ylabel("$ET_{norm}$ (mm/day)")
-# plt.legend()
-
 #%%
 from statsmodels.stats.anova import anova_lm
 
 biome_diff = anova_lm(smf.ols("tau_ddreg ~ C(combined_biome)",data=df_meta).fit())
-#%%
-xi = 0
-col_use = "smcavg"
-site_10  = []
-cols0 = []
-cols1 = []
-t_out = []
-for x in pd.unique(site_dd_limit.SITE_ID):
-    dfx = site_dd_limit.loc[site_dd_limit.SITE_ID==x].copy()
-    dfx0 = dfx.loc[dfx.wl==0].copy().dropna()[col_use]
-    dfx1 = dfx.loc[dfx.wl==1].copy().dropna()[col_use]
-    if len(dfx0) >= 10 and len(dfx1) >= 10:
-        t_out.append(scipy.stats.ttest_ind(dfx0, dfx1, equal_var=False))
-        cols0.append(np.array(dfx0))
-        cols1.append(np.array(dfx1))
-        site_10.append(x)
-#%%
-plt.figure()
-for i in range(len(site_10)):
-    plt.plot([i-0.075]*len(cols0[i]),cols0[i]/100,"bo",alpha=0.5, label="Not water-limited")
-    plt.plot([i+0.075]*len(cols1[i]),cols1[i]/100,"ro",alpha=0.5, label="Water-limited")
-    if i == 0:
-        plt.legend(title="Category of drydown")
-plt.ylabel("Drydown mean soil moisture")
-plt.xlabel("Site")
-plt.xticks(range(len(site_10)), site_10, rotation=90);  
 #%%
 site_year2 = ddlist.groupby("SITE_ID").nunique().reset_index()
 site_year2["N_year"] = site_year2.year
@@ -1120,11 +877,7 @@ df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
 'etr2_norm','gr2_norm',"cor_retrieved_smc","tau_rel_err"]].copy()
 df_export = pd.merge(df_export,site_year2[["SITE_ID","N_year"]],on="SITE_ID",how="left")
 newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2   soil_mois_model_cor    a_slope_relative_standard_error 	N_years_of_data".split()
-#%%
 df_export.columns = newcolnames
-#%%
-
-#df_export["ddlen_mean"] = df_export.reg_ndd/df_export.reg_npoints
 #%%
 xt = df_meta.tau
 print("Tau, lower upper mean: ")
@@ -1167,39 +920,7 @@ print(np.min(xt),np.max(xt))
 #%%
 site_meanLAI = all_results.groupby("SITE_ID").mean(numeric_only=True).reset_index()[["SITE_ID","LAI"]]
 df_meta2 = pd.merge(df_meta,site_meanLAI,on='SITE_ID',how="left")
-# ddlist2 = ddlist.loc[ddlist.SITE_ID.isin(df_meta.SITE_ID)].copy()
-# ddlist2["site_dd"] = ddlist2.SITE_ID + ddlist2.ddi.astype(str)
-# #%%
-# #ddimod = smf.ols("et_per_F_dm ~ 0 + C(site_dd):row0",data=ddlist2,missing="drop").fit()
-# #%%
-# ddmean = ddlist2.groupby("site_dd").first().reset_index()
-# #%%
-# site_id="US-Blo"
-# ddsite = ddmean.loc[ddmean.SITE_ID==site_id].copy()
-# ddsite_full = ddlist2.loc[ddlist2.SITE_ID==site_id].copy()
-# #%%
-# plt.figure()
-# plt.plot(ddsite.ddlen,-2/ddsite.ddslopes,'o')
-# plt.plot([0,np.max(ddsite.ddlen)],[0,np.max(ddsite.ddlen)])
-# plt.ylim(0,200)
-#ddlist2 = ddlist2.loc[ddlist2.ddlen < 40].copy()
-# taumod = smf.ols("et_per_F_dm ~ 0 + C(SITE_ID):row0",data=ddlist2,missing="drop").fit()
-# #%%
-# lenmod = smf.ols("et_per_F_dm ~ ddlen*row0",data=ddlist2,missing="drop").fit()
-# taulenmod = smf.ols("et_per_F_dm ~ C(SITE_ID):row0 + ddlen*row0",data=ddlist2,missing="drop").fit()
-# #%%
-# dlen_diff = anova_lm(taulenmod)
-#%%
-plt.figure(figsize=(9,9)); 
-plt.plot(df_meta.tau_ddreg_hi - df_meta.tau_ddreg_lo, df_meta.tau_ddreg0_hi - df_meta.tau_ddreg0_lo,'o'); 
-plt.plot([0,100],[0,100],label="1:1 line");
-plt.xlabel("CI width without centering (days)")
-plt.ylabel("CI width with centering (days)")
-plt.legend()
-plt.xlim(0,100)
-plt.ylim(0,100)
-#%%
-
+laimod = smf.ols("etr2_norm ~ LAI_y", data=df_meta2.loc[df_meta2.etr2_norm > 0]).fit()
 #%%
 fig, ax = plt.subplots(2,2,figsize=(10,8))
 ax[0,0].plot(df_meta.reg_ndd, df_meta.tau_rel_err,'o'); 
