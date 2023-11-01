@@ -282,6 +282,8 @@ def prepare_df(fname, site_id, bif_forest):
     #myga = (wsarr/ustar**2 + 6.2*ustar**(-2/3))**-1
     myga = ustar**2/wsarr
     
+    #myga = 1/(1/myga + 6.2*ustar**-0.667)
+    
     lambda0 = 2.26*10**6
     sV = 0.04145*np.exp(0.06088*airt_summer) #in kpa
     gammaV = 100*1005/(lambda0*0.622) #in kpa
@@ -423,3 +425,17 @@ all_results.to_csv("dailydata_aug26.csv")
 #                       "year":np.concatenate(years),
 #                       "rain_mm":np.concatenate(rains)})
 # raindf.to_csv("rain_80lai_climseas_april12.csv")
+#%%
+# di = 250
+# plt.plot(daily_cond,
+#          1/44200*(sV[di]*(myrn[di]-ground_heat[di]) + 1.225*1000*vpd_summer[di]*myga[di])/(sV[di] + gammaV*(1+ myga[di]/(daily_cond*(22.4*gasvol_fac[di]/1000)))),'.'); 
+# plt.plot([0,0.6],[0,0.6*vpd_summer[di]/100])
+# #%%
+# di = 250
+# plt.plot(vpd_summer,
+#          1/44200*(sV[di]*(myrn[di]-ground_heat[di]) + 1.225*1000*vpd_summer*myga[di])/(sV[di] + gammaV*(1+ myga[di]/(daily_cond[di]*(22.4*gasvol_fac[di]/1000)))),'.'); 
+# plt.plot([0,3.5],[0,3.5* daily_cond[di]/100])
+# #%%
+# et_fake1 = (sV*(np.nanmean(myrn)-ground_heat) + 1.225*1000*vpd_summer*myga)*(myrn > 0)/(sV + gammaV*(1+ myga/(daily_cond*(22.4*gasvol_fac/1000))))
+# et_fake2 = (sV*(np.nanmean(myrn)-ground_heat) + 1.225*1000*vpd_summer*myga)*(myrn > 0)/(sV + gammaV*(1+ myga/(0.025*smc_summer*lai_all/np.nanmean(lai_all)*(22.4*gasvol_fac/1000))))
+# et_fake3 = (sV*(myrn-ground_heat) + 1.225*1000*vpd_summer*myga)*(myrn > 0)/(sV + gammaV*(1+ myga/(0.025*smc_summer*lai_all/np.nanmean(lai_all)*(22.4*gasvol_fac/1000))))

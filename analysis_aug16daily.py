@@ -247,7 +247,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dd_doy = []
     
     individual_slopes = []
-    
+    dd_dates = []
     #%%
     for y0 in pd.unique(dfGS.year_new):
     #%%
@@ -336,6 +336,9 @@ for site_id in pd.unique(bigyear.SITE_ID):
                 #etcumDD = np.cumsum(etsel-rainsel)
                 #etcumDD -= etcumDD[0]
                 rDD = sm.OLS(yfull,sm.add_constant(etcumDD),missing='drop').fit()
+                #et_itself = et_mmday[starti:endi] / vpd_arr[starti:endi]
+                #timecor = cor_skipna(et_itself, np.arange(len(et_itself)))
+                #if timecor[0] < 0 and timecor[1] < 0.05:
 
                 if rDD.params[1] < 0:
                 #if True: #rDD.params[1] < 0:
@@ -343,6 +346,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
                     ddlabel.append([ddii]*len(yfull))
                     ddyears.append([y0]*len(yfull))
                     dd_doy.append(dfy.doy.iloc[starti:endi])
+                    dd_dates.append(dfy.date.iloc[starti:endi])
 
                     
                     frec.append(f_of_t)
@@ -415,7 +419,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
                          "etcum":np.concatenate(etcum),
                          "smc":np.concatenate(smclist),
                          "doy":np.concatenate(dd_doy),
-
+                         "date":np.concatenate(dd_dates),
                          "year":np.concatenate(ddyears),
                          "ddslopes":np.concatenate(individual_slopes),
                          "ddlen":np.concatenate([[len(x)]*len(x) for x in vpd_plain]),
@@ -448,7 +452,9 @@ for site_id in pd.unique(bigyear.SITE_ID):
 
     
     dmod2 = smf.ols("et2 ~ 0 + etcum:F + C(ddi):F",data=btab,missing='drop').fit()
-    dfull["tau_ddreg_et2"] = -2/dmod2.params.iloc[0]
+    dfull["tau_ddreg2"] = -2/dmod2.params.iloc[0]
+    dfull["tau_ddreg2_hi"] = -2/(dmod.params.iloc[-1]+2*dmod.bse.iloc[-1])
+    dfull["tau_ddreg2_lo"] = -2/(dmod.params.iloc[-1]-2*dmod.bse.iloc[-1])
     dfull["tauET2_rel_err"] = -dmod2.bse[0]/dmod2.params[0]
     #%%
     #dmod_sq = smf.ols("etnorm ~ 0 + etcum + np.power(etcum,2) + C(ddi)",data=btab,missing='drop').fit()
@@ -717,7 +723,57 @@ fig.tight_layout()
 fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.02),ncols=3)
 #ax.vlines(df_meta.ddrain_mean,df_meta.tau_75,df_meta.tau_25,color="k")
 #%%
+df_meta3 = df_meta.sort_values("etr2_norm")
+df_meta3["et_rank"] = np.arange(len(df_meta3))
 
+fig,axes = plt.subplots(3,1,figsize=(14,12))
+ax = axes[2]
+
+points_handles = []
+for i in range(len(biome_list)):
+    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
+    if len(subI) > 0:
+        pointI, = ax.plot(subI.et_rank,subI.etr2_norm,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
+        points_handles.append(pointI)
+ax.set_xticks(df_meta3.et_rank,df_meta3.SITE_ID,rotation=90,fontsize=14)
+#ax.set_xlim(0,250)
+ax.set_ylim(0,1)
+#ax.set_xlabel("Rank",fontsize=24)
+ax.set_title(r"$R^2$ of $ET/ET_{0}$ during water-limited drydowns",fontsize=24)
+
+#df_meta["r2_retrieved_smc"] = df_meta["cor_retrieved_smc"]**2
+df_meta3 = df_meta.sort_values("cor_retrieved_smc")
+df_meta3["s_rank"] = np.arange(len(df_meta3))
+ax = axes[1]
+points_handles = []
+for i in range(len(biome_list)):
+    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
+    if len(subI) > 0:
+        pointI, = ax.plot(subI.s_rank,subI.cor_retrieved_smc,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
+        points_handles.append(pointI)
+
+#ax.set_xlim(0,250)
+ax.set_ylim(0,1)
+ax.set_xticks(df_meta3.s_rank,df_meta3.SITE_ID,rotation=90,fontsize=14)
+ax.set_title(r"Corr. of modeled and observed soil moisture during water-limited drydowns",fontsize=24)
+#ax.axhline(0,color='k')
+
+df_meta3 = df_meta.sort_values("gppR2_exp")
+df_meta3["gpp_rank"] = np.arange(len(df_meta3))
+ax = axes[0]
+points_handles = []
+for i in range(len(biome_list)):
+    subI = df_meta3.loc[df_meta3.combined_biome==biome_list[i]]
+    if len(subI) > 0:
+        pointI, = ax.plot(subI.gpp_rank,subI.gppR2_exp,'o',alpha=0.75,markersize=10,color=mpl.colormaps["tab10"](i+2),label=biome_list[i])
+        points_handles.append(pointI)
+
+#ax.set_xlim(0,250)
+ax.set_ylim(0,1)
+ax.set_xticks(df_meta3.gpp_rank,df_meta3.SITE_ID,rotation=90,fontsize=14)
+ax.set_title(r"$R^2$ of GPP given observed g during growing season",fontsize=24)
+fig.tight_layout()
+fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.02),ncols=3)
 #%%
 biome_index = dict(zip(biome_list,range(len(biome_list))))
 df_meta["biome_number"] = [biome_index[x] for x in df_meta.combined_biome]
@@ -730,7 +786,7 @@ def myplot(ax,x,y,xlab,ylab):
     ax.set_xlabel(xlab)
     ax.set_ylabel(ylab)
     myr2 = np.corrcoef(x,y)[0,1]**2
-    ax.text(0.1,0.8,  "$R^2$ = " + str(np.round(myr2,2)),transform=ax.transAxes)
+    ax.text(0.1,0.85,  "$R^2$ = " + str(np.round(myr2,2)),transform=ax.transAxes)
 #%%
 fig,axes=plt.subplots(3,3,figsize=(12,10))
 
@@ -739,6 +795,10 @@ myplot(axes[2,0],df_meta.Aridity,df_meta.tau,
 myplot(axes[2,1],df_meta.Aridity_gs,df_meta.tau,
        "GrowSeas AI","")
 axes[2,2].set_axis_off()
+# myplot(axes[2,2],df_meta.ddrain_mean,df_meta.tau,
+#        "GrowSeas $D_{max}$","")
+# axes[2,2].plot([0,100],[0,100],'k--',label="1:1 line")
+# axes[2,2].legend(loc="lower right",fontsize=14)
 
 myplot(axes[1,0],df_meta.map_data,df_meta.tau,
        "Annual P (mm/day)",r"$\tau$ (days)")
@@ -756,6 +816,81 @@ myplot(axes[0,1],df_meta.fullyear_dmax,df_meta.tau,
 myplot(axes[0,2],df_meta.ddrain_2mean,df_meta.tau,
        "GrowSeas $D_{mean}$ (days)","")
 axes[0,2].plot([0,np.max(df_meta.ddrain_2mean)],[0,np.max(df_meta.ddrain_2mean)],'k--',label="1:1 line")
+axes[0,2].legend(loc="lower right",fontsize=14)
+
+fig.tight_layout()
+
+fig.legend(handles=points_handles,loc="upper center",bbox_to_anchor=(0.5,0.03),ncols=3 )
+#%%
+# def myplot2(ax,x0,y0,xlab,ylab):
+#     inliers = (x0 < np.sort(x0)[-2])*(y0 < np.sort(y0)[-2])
+#     x = x0[inliers]
+#     y = y0[inliers]
+
+#     ax.scatter(x,y,c=plot_colors[inliers])
+#     ax.set_xlabel(xlab)
+#     ax.set_ylabel(ylab)
+#     ax.set_ylim(0,70)
+#     myr2 = np.corrcoef(x,y)[0,1]**2
+#     ax.text(0.1,0.85,  "$R^2$ = " + str(np.round(myr2,2)),transform=ax.transAxes)
+
+#%%
+# def out_bounds(x0):
+#     x = np.log(x0)
+#     q1 = np.quantile(x,0.25)
+#     q3 = np.quantile(x,0.75)
+
+#     iqr = q3-q1
+#     return np.exp(q1-1.5*iqr),np.exp(q3+1.5*iqr)
+# def in_bounds(x):
+#     bX = out_bounds(x)
+#     return (x > bX[0])*(x < bX[1])
+# #%%
+def in_bounds(x):
+    return (x < np.sort(x)[-2]) #*(x > np.sort(x)[1])
+inliers = np.ones(len(df_meta))
+for col in ["tau","Aridity","Aridity_gs","ddrain_mean","map_data","gsrain_mean","gsrain_len","fullyear_dmean","fullyear_dmax","ddrain_2mean"]:
+    inliers *= np.array(in_bounds(df_meta[col]))
+inliers = inliers==1
+# #%%
+def myplot2(ax,x0,y0,xlab,ylab):
+    x = x0[inliers]
+    y = y0[inliers]
+
+    ax.scatter(x,y,c=plot_colors[inliers])
+    ax.set_xlabel(xlab)
+    ax.set_ylabel(ylab)
+    ax.set_ylim(0,70)
+    myr2 = np.corrcoef(x,y)[0,1]**2
+    ax.text(0.1,0.85,  "$R^2$ = " + str(np.round(myr2,2)),transform=ax.transAxes)
+#%%
+fig,axes=plt.subplots(3,3,figsize=(12,10))
+
+myplot2(axes[2,0],df_meta.Aridity,df_meta.tau,
+       "Annual AI",r"$\tau$ (days)")
+myplot2(axes[2,1],df_meta.Aridity_gs,df_meta.tau,
+       "GrowSeas AI","")
+#axes[2,2].set_axis_off()
+myplot2(axes[2,2],df_meta.ddrain_mean,df_meta.tau,
+       "GrowSeas $D_{max}$","")
+axes[2,2].plot([0,50],[0,50],'k--',label="1:1 line")
+axes[2,2].legend(loc="lower right",fontsize=14)
+myplot2(axes[1,0],df_meta.map_data,df_meta.tau,
+       "Annual P (mm/day)",r"$\tau$ (days)")
+
+myplot2(axes[1,1],df_meta.gsrain_mean,df_meta.tau,
+       "GrowSeas P (mm/day)","")
+
+myplot2(axes[1,2],df_meta.gsrain_len,df_meta.tau,
+       "GrowSeas length (days)","")
+
+myplot2(axes[0,0],df_meta.fullyear_dmean,df_meta.tau,
+       "Annual $D_{mean}$ (days)",r"$\tau$ (days)")
+myplot2(axes[0,1],df_meta.fullyear_dmax,df_meta.tau,
+       "Annual $D_{max}$ (days)","")
+myplot2(axes[0,2],df_meta.ddrain_2mean,df_meta.tau,
+       "GrowSeas $D_{mean}$ (days)","")
+axes[0,2].plot([0,50],[0,50],'k--',label="1:1 line")
 axes[0,2].legend(loc="lower right",fontsize=14)
 
 fig.tight_layout()
@@ -982,9 +1117,9 @@ df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
 'fullyear_dmax','fullyear_dmean','seas_rain_max0','seas_rain_mean0',
 'gppR2_exp','reg_ndd','reg_npoints',
 'tau_ddreg','tau_ddreg_lo','tau_ddreg_hi',
-'etr2_norm','gr2_norm',"cor_retrieved_smc"]].copy()
+'etr2_norm','gr2_norm',"cor_retrieved_smc","tau_rel_err"]].copy()
 df_export = pd.merge(df_export,site_year2[["SITE_ID","N_year"]],on="SITE_ID",how="left")
-newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2   soil_mois_model_cor 	N_years_of_data".split()
+newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2   soil_mois_model_cor    a_slope_relative_standard_error 	N_years_of_data".split()
 #%%
 df_export.columns = newcolnames
 #%%
@@ -1016,6 +1151,11 @@ print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt), np.sum(xt>0))
 xt = df_meta.gr2_norm
 print("g R2, lower upper mean: ")
 print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt) , np.sum(xt>0))
+
+#%%
+xt = df_meta.cor_retrieved_smc
+print("g R2, lower upper mean: ")
+print(np.nanquantile(xt,0.25),np.nanquantile(xt,0.75),np.nanmean(xt) )
 #%%
 xt = df_meta.mat_data
 print("Annual temp, lower upper: ")
