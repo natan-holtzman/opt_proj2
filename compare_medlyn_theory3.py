@@ -23,6 +23,8 @@ fig_size[1] = 8
 
 plt.rcParams['font.size']=26
 plt.rcParams["mathtext.default"] = "sf"
+plt.rcParams['figure.dpi']=150
+
 #%%
 g_range = np.linspace(-0.2,2,600)
 vmax = 15
@@ -182,6 +184,8 @@ ax.set_title("(f)",loc="left")
 ax.legend()
 
 plt.tight_layout(w_pad=2)
+#plt.savefig("ch3fig2.jpg")
+
 #%%
 vpd_const = 1
 tau_day = 30
@@ -199,6 +203,8 @@ plt.xlim(0,300)
 plt.ylim(30,90)
 plt.xlabel("w - $w_c$ (mm)")
 plt.ylabel("iWUE ($\mu$mol $CO_2$/mol $H_2 O$)")
+#plt.savefig("ch3figS1.jpg")
+
 #%%
 g_range = np.linspace(-0.2,2,600)
 vmax = 15
