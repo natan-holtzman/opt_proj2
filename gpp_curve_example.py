@@ -37,6 +37,7 @@ fig_size[1] = 7
 
 plt.rcParams['font.size']=18
 plt.rcParams["mathtext.default"] = "sf"
+plt.rcParams['figure.dpi']=150
 
 import matplotlib.dates as mdates
 myFmt = mdates.DateFormatter('%b %Y')
@@ -459,7 +460,7 @@ Ccoef = -Amax*c0
 aquad = (-Bcoef + np.sqrt(Bcoef**2 - 4*Acoef*Ccoef))/(2*Acoef)
 #%%
 
-plt.figure(dpi=200)
+plt.figure(dpi=150)
 plt.plot(dfnoon.cond,dfnoon.gpp,'.',label="Eddy covariance"); 
 plt.plot(garr,aquad,"k",linewidth=3,label="Michelis-Menten with diffusion")
 
@@ -469,6 +470,8 @@ plt.ylim(0,50)
 plt.xlabel("Hourly canopy conductance $(mol/m^2/s)$")
 plt.ylabel("Hourly GPP $(\mu mol/m^2/s)$")
 plt.legend()
+#plt.savefig("ch3figS2.jpg",bbox_inches="tight")
+
 #%%
 xarr = np.linspace(0,1.5,200)
 A1 = 30*(1-np.exp(-xarr/0.15))

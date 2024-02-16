@@ -183,11 +183,15 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["gpp_pred_hourly"] = dfull.amax_hourly*(1-np.exp(-dfull.cond2/dfull.gA_hourly))
     dfull["gpp_pred_daily"] = dfull.amax_daily*(1-np.exp(-dfull.cond2/dfull.gA_daily))
     
-    dfull["kgpp"] = dfull.gA_hourly
+    #dfull["kgpp"] = dfull.gA_hourly
+    dfull["kgpp"] = dfull.gA_daily
+
     #%%
     dfull["gppR2_exp_daily"] = r2_skipna(dfull.gpp_pred_daily,dfull.gpp_assess)
     dfull["gppR2_exp_hourly"] = r2_skipna(dfull.gpp_pred_hourly,dfull.gpp_assess)
-    dfull["gppR2_exp"] = dfull["gppR2_exp_hourly"]
+    #dfull["gppR2_exp"] = dfull["gppR2_exp_hourly"]
+    dfull["gppR2_exp"] = dfull["gppR2_exp_daily"]
+
     # if r2_skipna(dfull.gpp_pred_d2,dfull.gpp) < 0:
     #     site_message.append("GPP model did not fit")
     #     continue
@@ -447,14 +451,14 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["tau_ddreg"] = -2/dmod.params.iloc[-1]
     dfull["tau_ddreg_hi"] = -2/(dmod.params.iloc[-1]+2*dmod.bse.iloc[-1])
     dfull["tau_ddreg_lo"] = -2/(dmod.params.iloc[-1]-2*dmod.bse.iloc[-1])
-    dfull["tau_rel_err"] = -dmod.bse[-1]/dmod.params[-1]
+    dfull["tau_rel_err"] = -dmod.bse.iloc[-1]/dmod.params.iloc[-1]
 
     
     dmod2 = smf.ols("et2 ~ 0 + etcum:F + C(ddi):F",data=btab,missing='drop').fit()
     dfull["tau_ddreg2"] = -2/dmod2.params.iloc[0]
     dfull["tau_ddreg2_hi"] = -2/(dmod.params.iloc[-1]+2*dmod.bse.iloc[-1])
     dfull["tau_ddreg2_lo"] = -2/(dmod.params.iloc[-1]-2*dmod.bse.iloc[-1])
-    dfull["tauET2_rel_err"] = -dmod2.bse[0]/dmod2.params[0]
+    dfull["tauET2_rel_err"] = -dmod2.bse.iloc[0]/dmod2.params.iloc[0]
 #%%
     srec = dmod.predict(btab)/-dmod.params.iloc[-1]
     dfull["cor_retrieved_smc"] = cor_skipna(srec,btab.smc)[0]
