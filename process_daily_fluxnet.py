@@ -85,6 +85,9 @@ def fill_na2(x,y):
 def prepare_df(fname, site_id, bif_forest):
     #%%
     df = pd.read_csv(fname,parse_dates=["TIMESTAMP"])
+    if len(df) < 366:
+        print("Not enough ET")
+        return "Not enough data"
     df[df==-9999] = np.nan
     latdeg = bif_forest.loc[bif_forest.SITE_ID==site_id].LOCATION_LAT.iloc[0]
     
@@ -167,22 +170,27 @@ def prepare_df(fname, site_id, bif_forest):
     #%%
     df['etqc'] = et_summer
     
-    my_clim = df.groupby("doy_new").mean(numeric_only=True)
+    yearct = df.groupby("year_new").count().reset_index()
+    full_years = list(yearct.loc[yearct.LAI > 360,"year_new"])
+    dyear_complete = df.loc[df.year_new.isin(full_years)]
     
-    gpp_clim = np.array(1*my_clim["GPP_DT_VUT_REF"] + 1*my_clim["GPP_NT_VUT_REF"])/2
     
-    #gpp_clim_std = gpp_clim - np.nanmin(gpp_clim)
+    my_clim = dyear_complete.groupby("doy_new").mean(numeric_only=True)
     
-    gpp_adjoin = fill_na(np.tile(gpp_clim,3))
+    # gpp_clim = np.array(1*my_clim["GPP_DT_VUT_REF"] + 1*my_clim["GPP_NT_VUT_REF"])/2
     
-    gpp_clim_smooth = np.zeros(len(gpp_adjoin))
-    swidth = 14
+    # #gpp_clim_std = gpp_clim - np.nanmin(gpp_clim)
     
-    for i in range(swidth,len(gpp_adjoin)-swidth):
-        gpp_clim_smooth[i] = np.nanmean(gpp_adjoin[i-swidth:i+swidth+1])
+    # gpp_adjoin = fill_na(np.tile(gpp_clim,3))
+    
+    # gpp_clim_smooth = np.zeros(len(gpp_adjoin))
+    # swidth = 14
+    
+    # for i in range(swidth,len(gpp_adjoin)-swidth):
+    #     gpp_clim_smooth[i] = np.nanmean(gpp_adjoin[i-swidth:i+swidth+1])
 
-    gpp_clim_smooth[:swidth] = np.mean(gpp_clim[:swidth])
-    gpp_clim_smooth[-swidth:] = np.mean(gpp_clim[-swidth:])  
+    # gpp_clim_smooth[:swidth] = np.mean(gpp_clim[:swidth])
+    # gpp_clim_smooth[-swidth:] = np.mean(gpp_clim[-swidth:])  
     
     gpp_summer = np.array(1*df["GPP_DT_VUT_REF"] + 1*df["GPP_NT_VUT_REF"])/2
     #gpp_summer_nt = np.array(df["GPP_NT_VUT_REF"])
@@ -199,7 +207,7 @@ def prepare_df(fname, site_id, bif_forest):
     lai_clim_std = lai_clim / np.max(lai_clim)
     
     topday = np.argmax(lai_clim_std)
-    under50 = np.where(lai_clim_std < 0.8)[0]
+    under50 = np.where(lai_clim_std < 0.75)[0]
     #%%
     try:
         summer_start = under50[under50 < topday][-1]
@@ -215,37 +223,37 @@ def prepare_df(fname, site_id, bif_forest):
     #gpp_smooth[:swidth] = np.mean(gpp_summer[:swidth])
     #gpp_smooth[-swidth:] = np.mean(gpp_summer[-swidth:])
     #%%
-    df["gpp_smooth"] = 0
+    #df["gpp_smooth"] = 0
     
 #    year95 = df.groupby("year_new").quantile(0.95,numeric_only=True).reset_index()
-    year95 = df.groupby("year_new").max(numeric_only=True).reset_index()
+    #year95 = df.groupby("year_new").max(numeric_only=True).reset_index()
 
-    year95["gpp_y95"] = 1*year95["gpp_smooth"]
-    year95["lai_y95"] = 1*year95["LAI"]
+    #year95["gpp_y95"] = 1*year95["gpp_smooth"]
+    #year95["lai_y95"] = 1*year95["LAI"]
 #%%
 #    yearMin = df.groupby("year_new").quantile(0.05,numeric_only=True).reset_index()
-    yearMin = df.groupby("year_new").min(numeric_only=True).reset_index()
+    # yearMin = df.groupby("year_new").min(numeric_only=True).reset_index()
 
-    yearMin["lai_ymin"] = 1*yearMin["LAI"]
-    yearMin["gpp_ymin"] = 1*yearMin["gpp_smooth"]
+    # yearMin["lai_ymin"] = 1*yearMin["LAI"]
+    # yearMin["gpp_ymin"] = 1*yearMin["gpp_smooth"]
 
-    #%%
-    df = pd.merge(df,year95[["year_new","lai_y95","gpp_y95"]],how="left",on="year_new")
+    # #%%
+    # df = pd.merge(df,year95[["year_new","lai_y95","gpp_y95"]],how="left",on="year_new")
     
-    df = pd.merge(df,yearMin[["year_new","lai_ymin","gpp_ymin"]],how="left",on="year_new")
+    # df = pd.merge(df,yearMin[["year_new","lai_ymin","gpp_ymin"]],how="left",on="year_new")
     
     #%%
-    plot_gs = 0
-    if plot_gs:
-        #%%
-        plt.figure()
-        plt.plot(gpp_clim)
-        plt.plot(gpp_clim_smooth)
-        #plt.axvspan(summer_start,summer_end,color="green",alpha=0.33)
-        plt.twinx()
-        plt.plot(my_clim.SW_IN_POT,'r')
-        plt.twinx()
-        plt.plot(my_clim.LAIclim,'k')
+    # plot_gs = 0
+    # if plot_gs:
+    #     #%%
+    #     plt.figure()
+    #     plt.plot(gpp_clim)
+    #     plt.plot(gpp_clim_smooth)
+    #     #plt.axvspan(summer_start,summer_end,color="green",alpha=0.33)
+    #     plt.twinx()
+    #     plt.plot(my_clim.SW_IN_POT,'r')
+    #     plt.twinx()
+    #     plt.plot(my_clim.LAIclim,'k')
 
     #%%
 
@@ -349,7 +357,11 @@ def prepare_df(fname, site_id, bif_forest):
                               "smc":smc_summer,
                               
                               "gpp_dt":df["GPP_DT_VUT_REF"],
-                              "gpp_nt":df["GPP_NT_VUT_REF"]
+                              "gpp_nt":df["GPP_NT_VUT_REF"],
+                              
+                              "patm":patm_summer,
+                              "ws":wsarr,
+                              "ustar":ustar
 
                              
                               })
@@ -410,7 +422,7 @@ for fname in forest_daily:#[forest_daily[x] for x in [70,76]]:
     all_results.append(df_to_fit)
     #%%
 all_results = pd.concat(all_results)
-all_results.to_csv("dailydata_aug26.csv")
+all_results.to_csv("dailydata_feb22.csv")
 #%%
 # sites = []
 # years = []

@@ -57,9 +57,9 @@ year_tau_dict = {}
 site_result = {}
 
 #%%
-bigyear = pd.read_csv("data_with_daytime_aug28b.csv")
+#bigyear = pd.read_csv("data_with_daytime_aug28b.csv")
 
-#bigyear = pd.read_csv("data_with_daytime_sept13.csv")
+bigyear = pd.read_csv("data_with_daytime_feb22_norainQC.csv")
 
 simple_biomes = {"SAV":"Savanna",
                  "WSA":"Savanna",
@@ -80,10 +80,36 @@ biome_list = ["Evergreen needleleaf forest", "Mixed forest", "Deciduous broadlea
 bigyear = pd.merge(bigyear,bif_forest,on="SITE_ID",how='left')
 
 bigyear["combined_biome"] = [simple_biomes[x] for x in bigyear["IGBP"]]
-
+#bigyear = bigyear.loc[bigyear.P_F_QC == 0].copy()
 #bigyear = bigyear.loc[bigyear.year >= 2001].copy()
 #%%
-fullyear = pd.read_csv("dailydata_aug21.csv")
+#fullyear = pd.read_csv("dailydata_aug21.csv")
+fullyear = pd.read_csv("dailydata_feb22.csv")
+#%%
+def find_GS(x,c):
+    topday = np.argmax(x)
+    under50 = np.where(x < c*np.max(x))[0]
+    try:
+        clim_summer_start = under50[under50 < topday][-1] + 1
+    except:
+        clim_summer_start = 0
+    try:
+        clim_summer_end = under50[under50 > topday][0] -1
+    except:
+        clim_summer_end = 365
+    return clim_summer_start, clim_summer_end
+#%%
+def ysmooth(x,swidth):
+    gpp_adjoin = np.tile(x,3)
+    
+    gpp_clim_smooth = np.zeros(len(gpp_adjoin))
+    
+    for i in range(swidth,len(gpp_adjoin)-swidth):
+        gpp_clim_smooth[i] = np.nanmean(gpp_adjoin[i-swidth:i+swidth+1])
+
+    gpp_clim_smooth[:swidth] = np.mean(x[:swidth])
+    gpp_clim_smooth[-swidth:] = np.mean(x[-swidth:])
+    return gpp_clim_smooth[365:365*2]
 #%%
 site_message = []
 site_dd_limit = []
@@ -112,8 +138,89 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["map_data"] = np.nanmean(dyear.rain)
     dfull["mat_data"] = np.nanmean(dyear.airt)
     #%%
-    #dfull = pd.merge(dfull,dyear[["date","gpp_dt","gpp_nt"]],on="date",how="left")
-
+    yearct = dyear.groupby("year_new").count().reset_index()
+    full_years = list(yearct.loc[yearct.LAI > 360,"year_new"])
+    dyear_complete = dyear.loc[dyear.year_new.isin(full_years)]
+    
+    climdf = dyear_complete.groupby("doy").mean(numeric_only=True).reset_index().iloc[:365]
+    climLAI = np.array(climdf.LAI)
+    climLAI_norm = (climLAI-np.min(climLAI))/(np.max(climLAI)-np.min(climLAI))
+    #%%
+    summer_start = np.min(dfull.doy)
+    summer_end = np.max(dfull.doy)
+    dfull["gpp_frac_in_gs"] = np.sum(climdf.gpp[summer_start:summer_end])/np.sum(climdf.gpp)
+    #%%
+    # gsET = find_GS(ysmooth(np.array(climdf.ET),30), 0.75)
+    # gsGPP = find_GS(ysmooth(np.array(climdf.gpp),30), 0.75)
+    # gsLAI = find_GS(np.array(climdf.LAI)/np.max(climdf.LAI), 0.75)
+    # #%%
+    # dfull["gsdiff_et_gpp"] = np.sum(np.abs(np.array(gsET) - np.array(gsGPP)))
+    # dfull["gsdiff_et_lai"] = np.sum(np.abs(np.array(gsET) - np.array(gsLAI)))
+    # dfull["gsdiff_gpp_lai"] = np.sum(np.abs(np.array(gsGPP) - np.array(gsLAI)))
+    # #%%
+    # cumGPP = np.array(np.cumsum(climdf.gpp))
+    # gsLAI_len = gsLAI[1] - gsLAI[0]
+    # gpp_sample_sum = cumGPP[gsLAI_len:] - cumGPP[:-gsLAI_len]
+    
+    # cumET = np.array(np.cumsum(climdf.ET))
+    # et_sample_sum = cumET[gsLAI_len:] - cumET[:-gsLAI_len]
+    # #%%
+    # maxloc = np.argmax(climLAI)
+    # if maxloc < summer_start or maxloc > summer_end:
+    #     print("ISSUE")
+        #continue
+    # myspl = scipy.interpolate.splrep(np.arange(365),climLAI,task=-1,t=np.array([summer_start,maxloc,summer_end]))
+    # #%%
+    # #gscent = (summer_start+summer_end)/2
+    # cor_skipna(scipy.interpolate.splev(np.arange(365),myspl),climLAI)
+    # #%%
+    # def tofit(pars):
+    #     fitted = np.exp(-pars[0]*np.sin(np.pi*(np.arange(365)-gscent)/365)**2)
+    #     return fitted - climLAI_norm
+    # myfit = scipy.optimize.least_squares(tofit,x0=np.array([3]),method="lm")
+    # #%%
+    # fitted = np.exp(-myfit.x[0]*np.sin(np.pi*(np.arange(365)-gscent)/365)**2)
+    # laires = climLAI_norm-fitted
+    # ml2 = np.argmax(laires)
+    # #ml2_hgt = np.max(laires)
+    # def tofit2(pars):
+    #     w1,w2,h2 = pars
+    #     f1 = np.exp(-w1*np.sin(np.pi*(np.arange(365)-gscent)/365)**2)
+    #     f2 = h2*np.exp(-w2*np.sin(np.pi*(np.arange(365)-ml2)/365)**2)
+    #     fsum = f1+f2
+    #     fsum /= np.max(fsum)
+    #     return fsum - climLAI_norm
+    
+    # myfit2 = scipy.optimize.least_squares(tofit2,x0=np.array([3,3,0.5]),method="lm")
+    # #%%
+    #fitted2 = ml2_hgt*np.exp(-myfit.x[0]*np.sin(np.pi*(np.arange(365)-ml2)/365)**2)
+    #%%
+    # is_peak = np.where((climLAI[1:-1]>climLAI[:-2])*(climLAI[1:-1]>climLAI[2:]))[0]+1
+    # secondary_peak = is_peak[(is_peak < summer_start) | (is_peak > summer_end)]
+    # # #relative_sec_peak = climLAI_norm[secondary_peak]
+    # #secondary_peak = is_peak[is_peak != maxloc]
+    # proms = []
+    # valley_hs = []
+    # for x in secondary_peak:
+    #     if x < maxloc:
+    #         valley_height = np.min(climLAI[x:maxloc])
+    #     else:
+    #         valley_height = np.min(climLAI[maxloc:x])
+    #     valley_hs.append(valley_height)
+    #     proms.append((climLAI[x] - valley_height))#/(climLAI_norm[maxloc]-valley_height))
+    # #%%
+    # if len(secondary_peak) > 0:
+    #     dfull["lai_2p"] = np.max(proms)
+    # #     valley_hs = np.array(valley_hs)
+    # #     proms = np.array(proms)
+    # #     if np.sum((proms > 0.25)*(valley_hs < 0.25)) > 0:
+    # #         dfull["lai_2gs"] = 1
+    # #     else:
+    # #         dfull["lai_2gs"] = 0
+    # else:
+    #     dfull["lai_2p"] = 0
+    #myfft = scipy.fft.fft(climLAI)
+    #dfull["lai_2cycle_frac"] = np.abs(myfft[2])/np.abs(myfft[1])
     #%%
     z1 = np.array(dyear.rain)
     y1 = np.array(dyear.year_new)
@@ -183,14 +290,32 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["gpp_pred_hourly"] = dfull.amax_hourly*(1-np.exp(-dfull.cond2/dfull.gA_hourly))
     dfull["gpp_pred_daily"] = dfull.amax_daily*(1-np.exp(-dfull.cond2/dfull.gA_daily))
     
-    #dfull["kgpp"] = dfull.gA_hourly
-    dfull["kgpp"] = dfull.gA_daily
-
+    dfull["kgpp"] = dfull.gA_hourly
+    z1b = np.array(1-np.exp(-dfull.cond2/ dfull.kgpp)) 
+    z1b = z1b[np.isfinite(z1b)]
+    dfull["input_below_half"] = np.mean(z1b<0.5)
+    dfull["input_above_90"] = np.mean(z1b>0.9)
+    #%%
+    dfull["cor1_exp"] = cor_skipna(1-np.exp(-dfull.cond2/dfull.gA_hourly), dfull.gpp_assess/dfull.amax_hourly)[0]
+    dfull["cor1_lin"] = cor_skipna(dfull.cond2/dfull.gA_hourly, dfull.gpp_assess/dfull.amax_hourly)[0]
+    #dfull["kgpp"] = dfull.gA_daily
+    dfull["cga"] = dfull.cond2/dfull.gA_hourly
+    linmod_test = smf.ols("gpp_assess ~ 0 + cga:amax_hourly + amax_hourly", data = dfull,missing="drop").fit()
+    dfull["cor2_exp"] = cor_skipna(dfull.amax_hourly*(1-np.exp(-dfull.cond2/dfull.gA_hourly)), dfull.gpp_assess)[0]
+    dfull["cor2_lin"] = cor_skipna(dfull.cga*dfull.amax_hourly*linmod_test.params.iloc[0] + dfull.amax_hourly*linmod_test.params.iloc[1], dfull.gpp_assess)[0]
+    #%%
+    #dfull["gpp_pred_hourly_x10"] = dfull.amax_hourly*(1-np.exp(-dfull.cond2/(dfull.gA_hourly/2)))
+    #dfull["gpp_pred_hourly_x10"] *= np.mean(dfull["gpp_pred_hourly"])/np.mean(dfull["gpp_pred_hourly_x10"] )
     #%%
     dfull["gppR2_exp_daily"] = r2_skipna(dfull.gpp_pred_daily,dfull.gpp_assess)
     dfull["gppR2_exp_hourly"] = r2_skipna(dfull.gpp_pred_hourly,dfull.gpp_assess)
-    #dfull["gppR2_exp"] = dfull["gppR2_exp_hourly"]
-    dfull["gppR2_exp"] = dfull["gppR2_exp_daily"]
+    dfull["gppR2_exp_full_hourly"] = r2_skipna(dfull.gpp_pred_from_hourly[dfull.gpp_pred_from_hourly > 0],dfull.gpp_assess[dfull.gpp_pred_from_hourly > 0])
+    
+    #dfull["gppR2_exp_hourly_x2"] = r2_skipna(dfull.gpp_pred_hourly_x2,dfull.gpp_assess)
+#%%
+
+    dfull["gppR2_exp"] = dfull["gppR2_exp_hourly"]
+    #dfull["gppR2_exp"] = dfull["gppR2_exp_daily"]
 
     # if r2_skipna(dfull.gpp_pred_d2,dfull.gpp) < 0:
     #     site_message.append("GPP model did not fit")
@@ -260,8 +385,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
         
         doy_indata = np.array(dfy.doy)
         vpd_arr = np.clip(np.array(dfy.vpd),0.1,np.inf)/100
-        # if np.sum(np.isfinite(vpd_arr)) < 25:
-        #     continue
+        if np.sum(np.isfinite(vpd_arr)) < 25:
+            continue
         vpd_interp = np.interp(doy_indata,
                             doy_indata[np.isfinite(vpd_arr)],
                             vpd_arr[np.isfinite(vpd_arr)])
@@ -402,6 +527,10 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["tau_ddreg0_lo"] = -2/(r1.params[0] - 2*r1.bse[0])
     dfull["tau_ddreg0_hi"] = -2/(r1.params[0] + 2*r1.bse[0])
     #%%
+    
+    # r1b= sm.OLS(row0,et_topred,missing='drop').fit()
+    # dfull["tau_reverse"] = -2*r1b.params[0]
+    #%%
     dfull["gslen_annual"] = np.max(dfull.doy) - np.min(dfull.doy) # np.mean(seaslens)
     dfull["tau0_rel_err"] = -r1.bse[0]/r1.params[0]
     #dfull = dfull.loc[dfull.year_new.isin(pd.unique(dfgpp0.year_new))].copy()
@@ -427,7 +556,6 @@ for site_id in pd.unique(bigyear.SITE_ID):
                          "ddslopes":np.concatenate(individual_slopes),
                          "ddlen":np.concatenate([[len(x)]*len(x) for x in vpd_plain]),
                          "day_of_dd":np.concatenate([np.arange(len(x)) for x in vpd_plain])})
-
 
     #%%
     btab["cond"] = btab.ET/btab.VPD
@@ -481,6 +609,8 @@ for site_id in pd.unique(bigyear.SITE_ID):
     
     #%%
     
+    
+    #%%
     #tab1dd = tab1.groupby("ddi").mean(numeric_only=True).reset_index()
     tab1first = btab.groupby("ddi").first().reset_index()
     
@@ -498,9 +628,70 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["etr2_raw"] = r2_skipna(epredN,tab2.ET)
     dfull["gr2_raw"] = r2_skipna(epredN/tab2.VPD,tab2.cond)
     #%%
+    btab["g_pred"] = btab.etpred/btab.VPD
+    btab2 = pd.merge(btab,dyear[["date","airt","netrad","patm","ws","ustar"]],on="date",how="left")
+    #%%
+    aero_cond = btab2.ustar**2/btab2.ws
+    lambda0 = 2.26*10**6
+    sV = 0.04145*np.exp(0.06088*btab2.airt) #in kpa
+    gammaV = 100*1005/(lambda0*0.622) #in kpa
+    vpd_kpa = btab2.VPD*100
+    gasvol_fac = (btab2.airt + 273.15)/(25+273.15) * 101.325/btab2.patm
+    gpred_m_per_s = btab2.g_pred*1000/18/(60*60*24)
+    
+    gact_m_per_s = btab2.cond*1000/18/(60*60*24)
+
+    btab2["ET_pred_PM"] = 18/1000*(60*60*24)*1/44200*(sV*(btab2.netrad-0.1*btab2.netrad) + 1.225*1000*vpd_kpa*aero_cond)/(sV + gammaV*(1+ aero_cond/(gpred_m_per_s*(22.4*gasvol_fac/1000)))) 
+    btab2["ET_act_PM"] = 18/1000*(60*60*24)*1/44200*(sV*(btab2.netrad-0.1*btab2.netrad) + 1.225*1000*vpd_kpa*aero_cond)/(sV + gammaV*(1+ aero_cond/(gact_m_per_s*(22.4*gasvol_fac/1000)))) 
+
+    #%%
+    dfull["etr2_raw_act_PM"] = r2_skipna(btab2.ET_act_PM, btab2.ET)
+
+    dfull["etr2_norm_PM"] = r2_skipna(btab2["ET_pred_PM"]/tab2.et_init,tab2.ET/tab2.et_init)
+    dfull["etr2_raw_PM"] = r2_skipna(btab2["ET_pred_PM"],tab2.ET)
+    dfull["etr2_PMobs_Fpred"] = r2_skipna(btab.etpred,btab2["ET_pred_PM"])
+    #%%
+    PMrad = sV*(btab2.netrad-0.1*btab2.netrad)
+    PMvpd = 1.225*1000*vpd_kpa*aero_cond
+    dfull["PMrad_mean"] = np.nanmean(PMrad)
+    dfull["PMrad_std"] = np.nanstd(PMrad)
+    dfull["PMvpd_mean"] = np.nanmean(PMvpd)
+    dfull["PMvpd_std"] = np.nanstd(PMvpd)
+    dfull["PM_term_quotient"] = np.nanmean(PMvpd/PMrad)
+    
+    #%%
+    fulltab2 = dfull.copy()# pd.merge(dfull,dyear[["date","patm","ws","ustar"]],on="date",how="left")
+    
+    aero_cond = fulltab2.ustar**2/fulltab2.ws
+    sV = 0.04145*np.exp(0.06088*fulltab2.airt) #in kpa
+    
+    PMrad = sV*(fulltab2.netrad-0.1*fulltab2.netrad)
+    PMvpd = 1.225*1000*fulltab2.vpd*aero_cond
+    dfull["PMrad_mean_GS"] = np.nanmean(PMrad)
+    dfull["PMrad_std_GS"] = np.nanstd(PMrad)
+    dfull["PMvpd_mean_GS"] = np.nanmean(PMvpd)
+    dfull["PMvpd_std_GS"] = np.nanstd(PMvpd)
+    dfull["PM_term_quotient_GS"] = np.nanmean(PMvpd/PMrad)
+    #%%
+    gpp_residcor = cor_skipna((dfull.cond2/dfull.gA_hourly)[(dfull.cond2 > 0.025)*(dfull.cond2 < 0.5)],
+                              (dfull.gpp/dfull.gpp_pred_hourly)[(dfull.cond2 > 0.025)*(dfull.cond2 < 0.5)])
+    dfull["gpp_residcor"] = gpp_residcor[0]
+    dfull["gpp_residcor_pval"] = gpp_residcor[1]
+
+    #%%
     all_results.append(dfull)
     
     site_message.append("Tau estimated")
+    # dfull2 = pd.merge(dfull,dyear[["date","patm","ws","ustar"]],on="date",how="left")
+    # aero_cond = dfull2.ustar**2/dfull2.ws
+    # lambda0 = 2.26*10**6
+    # sV = 0.04145*np.exp(0.06088*dfull2.airt) #in kpa
+    # gammaV = 100*1005/(lambda0*0.622) #in kpa
+    # vpd_kpa = dfull2.vpd
+    # gasvol_fac = (dfull2.airt + 273.15)/(25+273.15) * 101.325/dfull2.patm
+    # et_pred_pm = 1/44200*(sV*(dfull2.netrad-0.1*dfull2.netrad) + 1.225*1000*vpd_kpa*aero_cond)/(sV + gammaV*(1+ aero_cond/(dfull2.cond*(22.4*gasvol_fac/1000)))) 
+
+    #gpred_m_per_s = btab2.g_pred*1000/(60*60*24)
     #%%
     #site_dd_tab = pd.DataFrame({"smc0":smc_start,"wl":is_limited,"smcavg":smc_avg,"smcend":smc_end}) #,
                                 #"etavg":et_avg,"etinit":et_init,"lai":lai_avg,"vpd":vpd_avg})
@@ -556,11 +747,21 @@ df_meta["gsrain_len"] = df_meta.gslen_annual
 #df_meta = df_meta.loc[df_meta.frac_gt9 > 0.01].copy()
 #df_meta = df_meta.loc[df_meta.frac_gt9 < 0.99].copy()
 
-df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 > 0.05].copy()
-df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 < 0.95].copy()
+#df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 > 0.2].copy()
+#df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 < 0.95].copy()
+#%%
+#df_meta = df_meta.loc[df_meta.input_above_90 > 0.25].copy()
+
+#df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 > 0.075].copy()
+#df_meta = df_meta.loc[df_meta.gpp_fit_frac_above9 < 0.925].copy()
+
 #df_meta = df_meta.loc[df_meta.max_resid_cor < 0.5].copy()
 #%%
-rainmod = smf.ols("tau_ddreg ~ ddrain_mean",data=df_meta).fit()
+df_meta = df_meta.loc[df_meta.gpp_frac_in_gs > 0.33].copy()
+#%%
+rainmod = smf.ols("tau_ddreg ~  ddrain_mean",data=df_meta).fit()
+
+rainmod_noint = smf.ols("tau_ddreg ~ 0 + ddrain_mean",data=df_meta).fit()
 #%%
 r2_11 = 1-np.mean((df_meta.ddrain_mean-df_meta.tau_ddreg)**2)/np.var(df_meta.tau_ddreg)
 print(r2_11)
@@ -570,13 +771,15 @@ fig,ax = plt.subplots(1,1,figsize=(10,8))
 lmax = 1.1*np.max(df_meta.ddrain_mean)
 
 betas = np.array(np.round(np.abs(rainmod.params),2)).astype(str)
-if rainmod.params[0] < 0:
+if rainmod.params.iloc[0] < 0:
     reg_eqn = r"$\tau$ = "+betas[1]+"$D_{max}$"+" - "+betas[0]
 else:
     reg_eqn = r"$\tau$ = "+betas[1]+"$D_{max}$"+" + "+betas[0]
 r2_txt = "($R^2$ = " + str(np.round(rainmod.rsquared,2)) + ")"
 reg_lab = "Regression line" + "\n" + reg_eqn + "\n" + r2_txt
-line2, = ax.plot([0,lmax],np.array([0,lmax])*rainmod.params[1]+rainmod.params[0],"b",label=reg_lab)
+line2, = ax.plot([0,lmax],np.array([0,lmax])*rainmod.params.iloc[1]+rainmod.params.iloc[0],"b",label=reg_lab)
+#line2, = ax.plot([0,lmax],np.array([0,lmax])*rainmod.params[0]+0,"b",label=reg_lab)
+
 line1, = ax.plot([0,lmax],[0,lmax],"k--",label="1:1 line")
 
 #plt.plot([0,150],np.array([0,150])*reg0.params[0],"b--",label="Regression line\n($R^2$ = 0.39)")
@@ -868,6 +1071,13 @@ from statsmodels.stats.anova import anova_lm
 
 biome_diff = anova_lm(smf.ols("tau_ddreg ~ C(combined_biome)",data=df_meta).fit())
 #%%
+agg_dd_limit = site_dd_limit.groupby("SITE_ID").mean().reset_index()
+df_meta = pd.merge(df_meta,agg_dd_limit,on="SITE_ID",how='left')
+df_meta["IS_BROADLEAF"] = df_meta.combined_biome.isin(['Deciduous broadleaf forest', 'Evergreen broadleaf forest',
+'Mixed forest'])
+print(np.mean(df_meta.loc[df_meta["IS_BROADLEAF"]==1, "wl"]))
+print(np.mean(df_meta.loc[df_meta["IS_BROADLEAF"]==0, "wl"]))
+#%%
 site_year2 = ddlist.groupby("SITE_ID").nunique().reset_index()
 site_year2["N_year"] = site_year2.year
 df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
@@ -878,9 +1088,10 @@ df_export = df_meta[["SITE_ID",'SITE_NAME',"combined_biome",'koeppen_climate',
 'fullyear_dmax','fullyear_dmean','seas_rain_max0','seas_rain_mean0',
 'gppR2_exp','reg_ndd','reg_npoints',
 'tau_ddreg','tau_ddreg_lo','tau_ddreg_hi',
-'etr2_norm','gr2_norm',"cor_retrieved_smc","tau_rel_err"]].copy()
+'etr2_norm','gr2_norm',"cor_retrieved_smc","tau_rel_err",
+"wl"]].copy()
 df_export = pd.merge(df_export,site_year2[["SITE_ID","N_year"]],on="SITE_ID",how="left")
-newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2   soil_mois_model_cor    a_slope_relative_standard_error 	N_years_of_data".split()
+newcolnames = "SITE_ID	SITE_NAME	Biome	koeppen_climate	LOCATION_LAT	LOCATION_LONG	LOCATION_ELEV	GrowSeas_length_days	MeanPrec_Annual_mmday	MeanPrec_GrowSeas_mmday	MeanAnnualTemp_degC	AridityIndex_annual	AridityIndex_GrowSeas	RainFreq_annual_perday	RainFreq_GrowSeas_perday	Dmax_annual_days	Dmean_annual_days	Dmax_GrowSeas_days	Dmean_GrowSeas_days	GPP_model_R2	N_drydowns_used	Total_drydown_days_used	Tau_days	Tau_95ci_low_days	Tau_95ci_high_days	ET_norm_predict_R2	g_norm_predict_R2   soil_mois_model_cor    a_slope_relative_standard_error 	Water_limited_fraction_of_drydowns N_years_of_data".split()
 df_export.columns = newcolnames
 #%%
 xt = df_meta.tau
@@ -896,6 +1107,11 @@ xt = df_export.N_years_of_data
 print("N year, lower upper mean: ")
 print(np.min(xt),np.max(xt),np.mean(xt))
 
+
+xt = df_meta.wl*100
+print("Frac dd WL, lower upper mean: ")
+print(np.min(xt),np.max(xt),np.mean(xt))
+
 xt = df_meta.gppR2_exp
 print("GPP R2, lower upper mean: ")
 print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt))
@@ -908,10 +1124,23 @@ print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt), np.sum(xt>0))
 xt = df_meta.gr2_norm
 print("g R2, lower upper mean: ")
 print(np.quantile(xt,0.25),np.quantile(xt,0.75),np.mean(xt) , np.sum(xt>0))
+#%%
+
+xt = df_meta.tau_rel_err*100
+print("tau rel err, lower upper mean: ")
+print(np.min(xt),np.max(xt),np.mean(xt))
+
+
+xt = df_meta.tau_ddreg_hi-df_meta.tau_ddreg_lo
+print("conf width, lower upper mean: ")
+print(np.min(xt),np.max(xt),np.mean(xt))
+#%%
+print(np.mean(df_meta.tau_rel_err[df_meta.reg_ndd >= 25])*100)
+print(np.mean(df_meta.tau_rel_err[df_meta.reg_ndd < 25])*100)
 
 #%%
 xt = df_meta.cor_retrieved_smc
-print("g R2, lower upper mean: ")
+print("smc R2, lower upper mean: ")
 print(np.nanquantile(xt,0.25),np.nanquantile(xt,0.75),np.nanmean(xt) )
 #%%
 xt = df_meta.mat_data
@@ -924,7 +1153,9 @@ print(np.min(xt),np.max(xt))
 #%%
 site_meanLAI = all_results.groupby("SITE_ID").mean(numeric_only=True).reset_index()[["SITE_ID","LAI"]]
 df_meta2 = pd.merge(df_meta,site_meanLAI,on='SITE_ID',how="left")
-laimod = smf.ols("etr2_norm ~ LAI_y", data=df_meta2.loc[df_meta2.etr2_norm > 0]).fit()
+df_meta3 = df_meta2.loc[df_meta2.etr2_norm > 0].reset_index()
+laimod = smf.ols("etr2_norm ~ LAI_y", data=df_meta3).fit()
+print(cor_skipna(df_meta3.LAI_y, df_meta3.etr2_norm))
 #%%
 fig, ax = plt.subplots(2,2,figsize=(10,8))
 ax[0,0].plot(df_meta.reg_ndd, df_meta.tau_rel_err,'o'); 
@@ -940,3 +1171,12 @@ ax[1,1].set_axis_off()
 
 fig.supylabel("Relative standard error of regression slope")
 fig.tight_layout()
+#%%
+
+#%%
+plt.figure(figsize=(7,7))
+plt.plot(df_meta.gppR2_exp_hourly,df_meta.gppR2_exp_full_hourly,'o'); 
+plt.plot([0,1],[0,1]);
+plt.xlabel("$R^2$ for GPP predicted with DAILY data")
+plt.ylabel("$R^2$ for GPP predicted with HOURLY data")
+
