@@ -160,8 +160,9 @@ fig.colorbar(pcm, ax=ax,label="$g_{MED}$ $(mol/m^2/s)$")
 
 
 #ax.colorbar()
-gdiff = new_opt_g-med_g
-absmax = np.max(np.abs(gdiff))
+gdiff = (new_opt_g-med_g)/med_g*100
+gdiff[np.isinf(gdiff)] = np.nan
+absmax = np.nanmax(np.abs(gdiff))
 ax = axes[2,0]
 pcm = ax.pcolormesh(vpd_range,s_sw_range*zsoil_mm,gdiff,cmap="RdBu",vmin=-absmax,vmax= absmax)
 ax.set_xlabel("VPD (kPa)")
@@ -169,7 +170,9 @@ ax.set_ylabel("w - $w_c$ (mm)")
 #ax.set_title("$g_{INT}-g_{MED}$ $(mol/m^2/s)$")
 ax.set_title("(e)",loc="left")
 
-fig.colorbar(pcm, ax=ax,label="$g_{INT}-g_{MED}$ $(mol/m^2/s)$")
+#fig.colorbar(pcm, ax=ax,label="$g_{INT}-g_{MED}$ $(mol/m^2/s)$")
+fig.colorbar(pcm, ax=ax,label="$g_{INT}-g_{MED}$ (%)")
+
 #ax.colorbar()
 
 ax = axes[2,1]

@@ -310,6 +310,7 @@ for site_id in pd.unique(bigyear.SITE_ID):
     dfull["gppR2_exp_daily"] = r2_skipna(dfull.gpp_pred_daily,dfull.gpp_assess)
     dfull["gppR2_exp_hourly"] = r2_skipna(dfull.gpp_pred_hourly,dfull.gpp_assess)
     dfull["gppR2_exp_full_hourly"] = r2_skipna(dfull.gpp_pred_from_hourly[dfull.gpp_pred_from_hourly > 0],dfull.gpp_assess[dfull.gpp_pred_from_hourly > 0])
+    dfull["gppR2_hourly_avg_vs_full"] = r2_skipna(dfull.gpp_pred_hourly[dfull.gpp_pred_from_hourly > 0],dfull.gpp_pred_from_hourly[dfull.gpp_pred_from_hourly > 0])
     
     #dfull["gppR2_exp_hourly_x2"] = r2_skipna(dfull.gpp_pred_hourly_x2,dfull.gpp_assess)
 #%%
@@ -1179,4 +1180,10 @@ plt.plot(df_meta.gppR2_exp_hourly,df_meta.gppR2_exp_full_hourly,'o');
 plt.plot([0,1],[0,1]);
 plt.xlabel("$R^2$ for GPP predicted with DAILY data")
 plt.ylabel("$R^2$ for GPP predicted with HOURLY data")
+#%%
+
+plt.figure()
+plt.hist(df_meta.gppR2_hourly_avg_vs_full); 
+plt.xlabel("$R^2$ between GPP predicted with DAILY and HOURLY data")
+plt.ylabel("Number of sites")
 
