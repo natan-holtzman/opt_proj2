@@ -424,30 +424,3 @@ for fname in forest_daily:#[forest_daily[x] for x in [70,76]]:
 all_results = pd.concat(all_results)
 all_results.to_csv("dailydata_feb22.csv")
 #%%
-# sites = []
-# years = []
-# rains = []
-# for x in rain_dict.keys():
-#     ri = rain_dict[x][0]
-#     sites.append(np.array([x]*len(ri)))
-#     years.append(rain_dict[x][1])
-#     rains.append(ri)
-# #%%
-# raindf = pd.DataFrame({"SITE_ID":np.concatenate(sites),
-#                       "year":np.concatenate(years),
-#                       "rain_mm":np.concatenate(rains)})
-# raindf.to_csv("rain_80lai_climseas_april12.csv")
-#%%
-# di = 250
-# plt.plot(daily_cond,
-#          1/44200*(sV[di]*(myrn[di]-ground_heat[di]) + 1.225*1000*vpd_summer[di]*myga[di])/(sV[di] + gammaV*(1+ myga[di]/(daily_cond*(22.4*gasvol_fac[di]/1000)))),'.'); 
-# plt.plot([0,0.6],[0,0.6*vpd_summer[di]/100])
-# #%%
-# di = 250
-# plt.plot(vpd_summer,
-#          1/44200*(sV[di]*(myrn[di]-ground_heat[di]) + 1.225*1000*vpd_summer*myga[di])/(sV[di] + gammaV*(1+ myga[di]/(daily_cond[di]*(22.4*gasvol_fac[di]/1000)))),'.'); 
-# plt.plot([0,3.5],[0,3.5* daily_cond[di]/100])
-# #%%
-# et_fake1 = (sV*(np.nanmean(myrn)-ground_heat) + 1.225*1000*vpd_summer*myga)*(myrn > 0)/(sV + gammaV*(1+ myga/(daily_cond*(22.4*gasvol_fac/1000))))
-# et_fake2 = (sV*(np.nanmean(myrn)-ground_heat) + 1.225*1000*vpd_summer*myga)*(myrn > 0)/(sV + gammaV*(1+ myga/(0.025*smc_summer*lai_all/np.nanmean(lai_all)*(22.4*gasvol_fac/1000))))
-# et_fake3 = (sV*(myrn-ground_heat) + 1.225*1000*vpd_summer*myga)*(myrn > 0)/(sV + gammaV*(1+ myga/(0.025*smc_summer*lai_all/np.nanmean(lai_all)*(22.4*gasvol_fac/1000))))

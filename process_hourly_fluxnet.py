@@ -162,35 +162,7 @@ for site in bif_forest.SITE_ID:
     #%%
     himean = np.mean(dfhi.gpp_norm)
     fit0 = np.array([himean,300,himean/150,400])
-    #%%
     
-    #%%
-    # dfday_save = dfday.copy()
-    # df_save = df.copy()
-    # #%%
-    # parlist = []
-    # galist = []
-    # for icv in range(10):
-    #     dfday = dfday_save.sample(int(len(dfday_save)/2))
-    #     def tofit(pars):
-    #         amax1,kA,gmax1,kG = pars
-            
-    #         amax = amax1*dfday.PPFD_in/(dfday.PPFD_in + kA)
-    #         gA = gmax1*dfday.PPFD_in/(dfday.PPFD_in + kG)
-
-    #         gpp_pred = amax*(1-np.exp(-dfday.cond_norm/gA))
-    #         z = (gpp_pred-dfday.gpp_norm)*dfday.LAI#[dfday.VPD > 1]
-    #         return z
-    #     myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))
-    #     amax1,kA,gmax1,kG = myfit.x
-    #     parlist.append(myfit.x)
-    #     #df_save["gA_hourly"] = gmax1*df_save.PPFD_in/(df_save.PPFD_in + kG) * df_save.LAI
-    #     #dailydf_test = df_save.groupby("date").mean(numeric_only=True).reset_index()
-    #     #galist.append(dailydf_test.gA_hourly)
-    # parlist = np.array(parlist)
-    # #%%
-    # dfday = dfday_save.copy()
-    # df = df_save.copy()
     #%%
     def tofit(pars):
         amax1,kA,gmax1,kG = pars
@@ -265,22 +237,7 @@ for site in bif_forest.SITE_ID:
 
 #%%
     dfull = gs2.copy()
-    #dfull = dfull.loc[dfull.P_F_QC == 0].copy()
-    #%%
-    #dfull["gpp_fit_frac_above9"] = np.mean(z1 > 0.9)
-    #dfull["gpp_fit_frac_below13"] = np.mean(z1 < 0.33)
     
-    #dfull["gpp_fit_Yfrac_above9"] = np.mean(z2 > 0.9)
-    #dfull["gpp_fit_Yfrac_below13"] = np.mean(z2 < 0.33)
-
-    #dfull["linmod_r2"] = linmod_r2
-    #dfull["expmod_r2"] = expmod_r2
-    # dfull["unc_amax1"] = np.std(parlist[:,0])/amax1
-    # dfull["unc_kA"] = np.std(parlist[:,1])/kA
-    # dfull["unc_gmax1"] = np.std(parlist[:,2])/gmax1
-    # dfull["unc_kG"] = np.std(parlist[:,3])/kG
-
-
     
     site_tab.append(dfull)
 #%%
@@ -288,88 +245,3 @@ site_tab = pd.concat(site_tab).reset_index()
 
 site_tab.to_csv("data_with_daytime_feb22_noRainQC.csv")
 #%%
-# def tofit(pars):
-#     kA,kG = pars
-    
-#     amax = dfday.PPFD_in * kA
-#     gA = dfday.PPFD_in * kG
-
-#     gpp_pred = amax*(1-np.exp(-dfday.cond_norm/gA))
-#     z = (gpp_pred-dfday.gpp_norm)#[dfday.VPD > 1]
-#     return z
-# himean = np.mean(dfhi.gpp_norm)
-# fit0 = np.array([himean/300,himean/150/400])
-# myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))
-
-# kA,kG = myfit.x
-
-# amax = dfday.PPFD_in * kA
-# gA = dfday.PPFD_in * kG
-
-# #gA = gmax1*dfday.PPFD_in/(dfday.PPFD_in + kG)
-# z1 = 1-np.exp(-dfday.cond_norm/gA)
-# #amax = amax1*dfday.PPFD_in/(dfday.PPFD_in + kA)
-# gpp_pred_h = dfday.LAI*amax*(1-np.exp(-dfday.cond_norm/gA))
-# #%%
-# df["gA_hourly"] = (df.PPFD_in * kG) * df.LAI
-# df["amax_hourly"] = (df.PPFD_in * kA) * df.LAI
-# df["gpp_pred_from_hourly"] = df["amax_hourly"] * (1 - np.exp(-df.cond/df["gA_hourly"]))
-#%%
-#gbase = np.array(diur.cond[7:18])
-# gblist = []
-# g0list = []
-# distart = 5
-# diend = 19
-# for i in range(50):
-#     diur = df.iloc[48*i:48*(i+1)].groupby("hour").mean(numeric_only=True).reset_index()
-    
-    
-#     gbase = np.array((diur.LE/44200/diur.VPD*100)[distart:diend])
-#     etsum = np.sum(diur.LE[distart:diend])/44200
-#     def optdiur(lg0):
-#         g0 = np.exp(lg0)
-#         g1 = g0/np.sum(g0*diur.VPD[distart:diend]/100)*etsum 
-#         a = diur.amax_hourly[distart:diend] * (1-np.exp(-g1/diur.gA_hourly[distart:diend]))
-#     #    a = diur.PPFD_in[5:18] * (1-np.exp(-g1/(diur.PPFD_in[5:18]*0.12/800)))
-    
-#         return -np.sum(a)
-#     myfit = scipy.optimize.minimize(optdiur,x0=np.zeros(len(gbase)),method="BFGS")  
-    
-#     g0 = np.exp(myfit.x)
-#     g1 = g0/np.sum(g0*diur.VPD[distart:diend]/100)*etsum 
-#     gblist.append(gbase)
-#     g0list.append(g1)
-#%%
-# def optdiur(lg0):
-#     g1 = np.zeros(len(gbase))
-#     g1[1:] = np.exp(lg0)
-#     g1[0] = (etsum - np.sum(g1[1:]*diur.VPD[8:18]/100))/diur.VPD[7]*100
-#     #g1 = g0/np.sum(g0*diur.VPD[7:18]/100)*etsum 
-#     a = diur.amax_hourly[7:18] * (1-np.exp(-g1/diur.gA_hourly[7:18]))
-# #    a = diur.PPFD_in[5:18] * (1-np.exp(-g1/(diur.PPFD_in[5:18]*0.12/800)))
-
-#     return -np.sum(a)
-# myfit = scipy.optimize.minimize(optdiur,x0=np.log(gbase[1:]),method="BFGS") 
-# def tofit(pars):
-#     amax1,kA,gmax1,kG,kT = pars
-    
-#     amax = amax1*dfday.PPFD_in/(dfday.PPFD_in + kA) * np.exp(dfday.T_AIR*kT)
-#     gA = gmax1*dfday.PPFD_in/(dfday.PPFD_in + kG)
-
-#     gpp_pred = amax*(1-np.exp(-dfday.cond_norm/gA))
-#     z = (gpp_pred-dfday.gpp_norm)#[dfday.VPD > 1]
-#     return z
-# himean = np.mean(dfhi.gpp_norm)
-# fit0 = np.array([himean,300,himean/150,400,0.001])
-# myfit = scipy.optimize.least_squares(tofit,x0=fit0,method="lm",x_scale=np.abs(fit0))  
-# #%%
-# amax1,kA,gmax1,kG,kT = myfit.x
-
-# # gA = gmax1*dfday.PPFD_in/(dfday.PPFD_in + kG)
-# # z1 = 1-np.exp(-dfday.cond_norm/gA)
-# # amax = amax1*dfday.PPFD_in/(dfday.PPFD_in + kA)
-# # gpp_pred_h = dfday.LAI*amax*(1-np.exp(-dfday.cond_norm/gA))
-# #%%
-# df["gA_hourly"] = gmax1*df.PPFD_in/(df.PPFD_in + kG) * df.LAI
-# df["amax_hourly"] = amax1*df.PPFD_in/(df.PPFD_in + kA) * df.LAI * np.exp(df.T_AIR*kT)
-# df["gpp_pred_from_hourly"] = df["amax_hourly"] * (1 - np.exp(-df.cond/df["gA_hourly"]))   
